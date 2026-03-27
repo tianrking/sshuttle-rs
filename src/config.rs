@@ -25,6 +25,12 @@ pub struct RunArgs {
     #[arg(long, default_value = "127.0.0.1:1080")]
     pub socks5: SocketAddr,
 
+    #[arg(long)]
+    pub ssh_remote: Option<String>,
+
+    #[arg(long, default_value = "ssh")]
+    pub ssh_cmd: String,
+
     #[arg(long = "include", default_value = "0.0.0.0/0")]
     pub include_cidrs: Vec<String>,
 
@@ -68,6 +74,8 @@ pub struct RuntimeConfig {
     pub mode: ModeArg,
     pub listen: SocketAddr,
     pub socks5: SocketAddr,
+    pub ssh_remote: Option<String>,
+    pub ssh_cmd: String,
     pub include_cidrs: Vec<String>,
     pub exclude_cidrs: Vec<String>,
     pub dry_run: bool,
@@ -84,6 +92,8 @@ impl From<RunArgs> for RuntimeConfig {
             mode: value.mode,
             listen: value.listen,
             socks5: value.socks5,
+            ssh_remote: value.ssh_remote,
+            ssh_cmd: value.ssh_cmd,
             include_cidrs: value.include_cidrs,
             exclude_cidrs: value.exclude_cidrs,
             dry_run: value.dry_run,

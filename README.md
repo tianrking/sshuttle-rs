@@ -17,6 +17,17 @@ cargo run -- run --mode transparent --socks5 127.0.0.1:1080 --listen 127.0.0.1:1
 sudo cargo run -- run --mode transparent --socks5 127.0.0.1:1080 --listen 127.0.0.1:18080
 ```
 
+## Linux transparent mode with built-in SSH dynamic tunnel
+
+```bash
+sudo cargo run -- run \
+  --mode transparent \
+  --ssh-remote user@example.com \
+  --ssh-cmd ssh \
+  --socks5 127.0.0.1:1080 \
+  --listen 127.0.0.1:18080
+```
+
 ## Linux transparent mode with DNS capture
 
 ```bash
@@ -42,6 +53,7 @@ The app now snapshots previous `ProxyEnable/ProxyServer` and restores them on ex
 
 - Linux backend: implemented (iptables OUTPUT redirect chain).
 - Transparent TCP relay to SOCKS5: implemented.
+- Optional SSH dynamic tunnel bootstrap (`ssh -N -D`): implemented.
 - DNS capture (Linux): implemented (`udp/53` redirect + local DNS forwarder).
 - Windows backend:
   - system-proxy mode: implemented (registry-based WinINET proxy toggle).

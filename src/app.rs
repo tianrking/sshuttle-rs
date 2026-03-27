@@ -1,5 +1,7 @@
 use anyhow::Result;
+use std::process::Stdio;
 use tokio::task::JoinHandle;
+use tokio::{process::Child, process::Command as TokioCommand, time::Duration};
 
 use crate::config::{Cli, Command, ModeArg, RuntimeConfig};
 use crate::platform::{build_platform, CommandExecutor};
@@ -20,6 +22,8 @@ async fn run_mode(cfg: RuntimeConfig) -> Result<()> {
     println!("[info] socks5 upstream: {}", cfg.socks5);
     println!("[info] transparent listen: {}", cfg.listen);
     println!("[info] dns capture: {}", if cfg.dns_capture { "on" } else { "off" });
+
+    let mut ssh_tunnel = start_ssh_dynamic_tunnel(&cfg).await?;
 
     if !cfg.no_apply_rules {
         platform.apply_rules(&rules, &exec).await?;
@@ -56,5 +60,38 @@ async fn run_mode(cfg: RuntimeConfig) -> Result<()> {
         platform.cleanup_rules(&rules, &exec).await?;
     }
 
+    if let Some(mut child) = ssh_tunnel.take() {
+        let _ = child.kill().await;
+        let _ = child.wait().await;
+    }
+
     Ok(())
+}
+
+async fn start_ssh_dynamic_tunnel(cfg: &RuntimeConfig) -> Result<Option<Child>> {
+    let Some(remote) = &cfg.ssh_remote else {
+        return Ok(None);
+    };
+
+    println!(
+        "[info] starting ssh dynamic tunnel: {} -N -D {} {}",
+        cfg.ssh_cmd, cfg.socks5, remote
+    );
+
+    let mut child = TokioCommand::new(&cfg.ssh_cmd)
+        .arg("-N")
+        .arg("-D")
+        .arg(cfg.socks5.to_string())
+        .arg(remote)
+        .stdin(Stdio::null())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .spawn()?;
+
+    tokio::time::sleep(Duration::from_millis(600)).await;
+    if let Some(status) = child.try_wait()? {
+        anyhow::bail!("ssh dynamic tunnel exited early with status: {status}");
+    }
+
+    Ok(Some(child))
 }
