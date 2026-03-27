@@ -99,3 +99,14 @@ Supported placeholders in command templates:
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for architecture and roadmap.
 
 CI runs `cargo check`, `cargo test`, and `cargo clippy -D warnings` on push/PR.
+
+## Build Matrix
+
+- Linux AMD64: `x86_64-unknown-linux-gnu`
+- Linux ARM64: `aarch64-unknown-linux-gnu`
+- Linux ARM32: `armv7-unknown-linux-gnueabihf`
+- Windows AMD64: `x86_64-pc-windows-msvc`
+- Windows ARM64: `aarch64-pc-windows-msvc`
+- Windows ARM32 (experimental): `thumbv7a-pc-windows-msvc`
+
+Tagging `v*` triggers release artifact builds for the matrix above.
