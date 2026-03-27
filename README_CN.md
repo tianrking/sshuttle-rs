@@ -102,6 +102,8 @@ Release 采用 tag (`v*`) 触发多架构构建。
 - Linux AMD64：`x86_64-unknown-linux-gnu`
 - Linux ARM64：`aarch64-unknown-linux-gnu`
 - Linux ARM32：`armv7-unknown-linux-gnueabihf`
+- Linux RISC-V64（best-effort）：`riscv64gc-unknown-linux-gnu`
+- macOS Apple Silicon（M 系列）：`aarch64-apple-darwin`
 - Windows AMD64：`x86_64-pc-windows-msvc`
 - Windows ARM64：`aarch64-pc-windows-msvc`
 - Windows 32-bit x86：`i686-pc-windows-msvc`

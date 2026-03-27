@@ -28,6 +28,16 @@ jobs:
             use_cross: true
             archive: tar.gz
             experimental: false
+          - os: ubuntu-latest
+            target: riscv64gc-unknown-linux-gnu
+            use_cross: true
+            archive: tar.gz
+            experimental: true
+          - os: macos-14
+            target: aarch64-apple-darwin
+            use_cross: false
+            archive: tar.gz
+            experimental: false
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             use_cross: false

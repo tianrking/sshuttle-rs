@@ -11,6 +11,8 @@ jobs:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
+          - os: macos-14
+            target: aarch64-apple-darwin
           - os: windows-latest
             target: x86_64-pc-windows-msvc
     runs-on: ${{ matrix.os }}
@@ -30,9 +32,14 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        target:
-          - aarch64-unknown-linux-gnu
-          - armv7-unknown-linux-gnueabihf
+        include:
+          - target: aarch64-unknown-linux-gnu
+            experimental: false
+          - target: armv7-unknown-linux-gnueabihf
+            experimental: false
+          - target: riscv64gc-unknown-linux-gnu
+            experimental: true
+    continue-on-error: ${{ matrix.experimental }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
