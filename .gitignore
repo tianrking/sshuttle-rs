@@ -1,1 +1,4 @@
 /target
+/.tmp_windivert
+/target-wincheck
+/target-wincheck-*
