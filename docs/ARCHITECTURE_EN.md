@@ -19,7 +19,7 @@
   - policy evaluator runtime hooks (decision + stats)
 - Platform Plane
   - Linux backend (`iptables/ip6tables` + `nft`)
-  - Windows backend (`system-proxy`, transparent native worker path)
+  - Windows backend (`system-proxy`, transparent native WinDivert dataplane path)
 
 ## Reliability Principles
 
@@ -44,6 +44,7 @@
 - Global TCP steering via platform redirect rules.
 - Upstream types: socks5/socks4/http.
 - DNS capture on Linux (with SOCKS5 UDP path).
+- Windows native transparent dataplane for TCP + DNS/selected UDP redirect path.
 - CI + release matrix with multi-arch artifacts.
 
 ## Next Focus

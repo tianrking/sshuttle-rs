@@ -4,6 +4,7 @@ mod doctor;
 mod platform;
 mod policy;
 mod proxy;
+mod win_divert_native;
 mod win_native;
 
 use clap::Parser;

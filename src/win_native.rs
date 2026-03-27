@@ -1,18 +1,20 @@
 use anyhow::Result;
-use serde::Deserialize;
 use std::collections::{BTreeMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::SystemTime;
-use tokio::process::Command;
 use tokio::time::{Duration, sleep};
 
 use crate::config::WinNativeWorkerArgs;
-use crate::policy::{FlowContext, FlowProto, PolicyEvaluator, PolicyFile};
+use crate::policy::{PolicyEvaluator, PolicyFile};
+use crate::win_divert_native::{
+    NativeRedirectConfig, PacketDecision, PacketEngine, WinDivertPacketEngine,
+};
 
 pub async fn run(args: WinNativeWorkerArgs) -> Result<()> {
     println!(
-        "[win-native-worker] started: listen_port={} proxy={} bypass_processes={} ",
+        "[win-native-worker] started: listen_ip={} listen_port={} proxy={} bypass_processes={} ",
+        args.listen_ip,
         args.listen_port,
         args.proxy_addr,
         args.bypass_processes.join(",")
@@ -24,7 +26,7 @@ pub async fn run(args: WinNativeWorkerArgs) -> Result<()> {
 
 struct WorkerRuntime {
     args: WinNativeWorkerArgs,
-    engine: Box<dyn DataplaneEngine>,
+    engine: Box<dyn RuntimeEngine>,
     policy_file: Option<PathBuf>,
     policy_last_modified: Option<SystemTime>,
     policy_eval: Option<PolicyEvaluator>,
@@ -35,7 +37,18 @@ struct WorkerRuntime {
 impl WorkerRuntime {
     fn new(args: WinNativeWorkerArgs) -> Result<Self> {
         let (policy_eval, modified) = load_policy(args.policy_file.as_deref())?;
-        let engine: Box<dyn DataplaneEngine> = Box::new(AutoEngine::new());
+        let engine: Box<dyn RuntimeEngine> = match NativeEngine::new(&args) {
+            Ok(native) => {
+                println!("[win-native-worker] native WinDivert engine active");
+                Box::new(native)
+            }
+            Err(err) => {
+                eprintln!("[win-native-worker][warn] native WinDivert init failed: {err:#}");
+                println!("[win-native-worker] trying external WinDivert engine handoff...");
+                Box::new(ExternalEngine::new())
+            }
+        };
+
         Ok(Self {
             policy_file: args.policy_file.clone(),
             policy_last_modified: modified,
@@ -55,7 +68,7 @@ impl WorkerRuntime {
                     println!("[win-native-worker] stop signal received, exiting");
                     break;
                 }
-                _ = sleep(Duration::from_secs(3)) => {
+                _ = sleep(Duration::from_millis(250)) => {
                     self.reload_policy_if_needed()?;
                     if let Err(err) = self.tick().await {
                         eprintln!("[win-native-worker][warn] tick failed: {err:#}");
@@ -109,32 +122,16 @@ impl WorkerRuntime {
     }
 
     async fn tick(&mut self) -> Result<()> {
-        let flows = self.engine.sample_flows().await?;
-        if let Some(eval) = self.policy_eval.as_mut() {
-            for flow in flows {
-                let decision = eval.evaluate(&flow);
-                let key = format!(
-                    "{:?}|{}|{}|{}",
-                    decision.action,
-                    flow.process_name.as_deref().unwrap_or("-"),
-                    flow.process_path.as_deref().unwrap_or("-"),
-                    flow.dst
-                );
-                let dkey = format!("{:?}", decision.action);
-                *self.decision_counts.entry(dkey).or_insert(0) += 1;
-                if self.seen.insert(key) {
-                    println!(
-                        "[win-native-worker][policy] {:?} proc={} path={} dst={} rule={} prio={}",
-                        decision.action,
-                        flow.process_name.as_deref().unwrap_or("-"),
-                        flow.process_path.as_deref().unwrap_or("-"),
-                        flow.dst,
-                        decision.matched_rule.as_deref().unwrap_or("default"),
-                        decision.matched_priority.unwrap_or(0)
-                    );
-                }
-            }
+        let decisions = self
+            .engine
+            .tick(self.policy_eval.as_mut(), &self.args.bypass_processes)
+            .await?;
 
+        for d in decisions {
+            self.observe_decision(d);
+        }
+
+        if let Some(eval) = self.policy_eval.as_ref() {
             let stats = eval.stats();
             let decision_summary = self
                 .decision_counts
@@ -154,8 +151,28 @@ impl WorkerRuntime {
             );
         }
 
-        println!("[win-native-worker] heartbeat: active");
         Ok(())
+    }
+
+    fn observe_decision(&mut self, d: PacketDecision) {
+        let dkey = format!("{:?}", d.action);
+        *self.decision_counts.entry(dkey).or_insert(0) += 1;
+        let key = format!(
+            "{:?}|{}|{}|{}",
+            d.action,
+            d.flow.process_name.as_deref().unwrap_or("-"),
+            d.flow.process_path.as_deref().unwrap_or("-"),
+            d.flow.dst
+        );
+        if self.seen.insert(key) {
+            println!(
+                "[win-native-worker][policy] {:?} proc={} path={} dst={}",
+                d.action,
+                d.flow.process_name.as_deref().unwrap_or("-"),
+                d.flow.process_path.as_deref().unwrap_or("-"),
+                d.flow.dst,
+            );
+        }
     }
 }
 
@@ -184,68 +201,73 @@ fn load_policy(path: Option<&Path>) -> Result<(Option<PolicyEvaluator>, Option<S
 }
 
 #[async_trait::async_trait]
-trait DataplaneEngine: Send {
+trait RuntimeEngine: Send {
     async fn start(&mut self, args: &WinNativeWorkerArgs) -> Result<()>;
+    async fn tick(
+        &mut self,
+        evaluator: Option<&mut PolicyEvaluator>,
+        bypass_processes: &[String],
+    ) -> Result<Vec<PacketDecision>>;
     async fn stop(&mut self);
-    async fn sample_flows(&mut self) -> Result<Vec<FlowContext>>;
 }
 
-struct AutoEngine {
-    inner: Option<Box<dyn DataplaneEngine>>,
+struct NativeEngine {
+    inner: WinDivertPacketEngine,
 }
 
-impl AutoEngine {
-    fn new() -> Self {
-        Self { inner: None }
+impl NativeEngine {
+    fn new(args: &WinNativeWorkerArgs) -> Result<Self> {
+        let cfg = NativeRedirectConfig::from_args(args);
+        let inner = WinDivertPacketEngine::new(cfg)?;
+        Ok(Self { inner })
     }
 }
 
 #[async_trait::async_trait]
-impl DataplaneEngine for AutoEngine {
-    async fn start(&mut self, args: &WinNativeWorkerArgs) -> Result<()> {
-        println!("[win-native-worker] trying WinDivert engine handoff...");
-        if let Some(engine) = ExternalEngine::spawn(args).await? {
-            self.inner = Some(Box::new(engine));
-            println!("[win-native-worker] external engine active");
-            return Ok(());
-        }
-        println!(
-            "[win-native-worker] external engine unavailable, fallback to built-in minimal engine"
-        );
-        self.inner = Some(Box::new(BuiltinProbeEngine));
+impl RuntimeEngine for NativeEngine {
+    async fn start(&mut self, _args: &WinNativeWorkerArgs) -> Result<()> {
         Ok(())
     }
 
-    async fn stop(&mut self) {
-        if let Some(engine) = self.inner.as_mut() {
-            engine.stop().await;
-        }
+    async fn tick(
+        &mut self,
+        evaluator: Option<&mut PolicyEvaluator>,
+        bypass_processes: &[String],
+    ) -> Result<Vec<PacketDecision>> {
+        self.inner.process_once(evaluator, bypass_processes)
     }
 
-    async fn sample_flows(&mut self) -> Result<Vec<FlowContext>> {
-        if let Some(engine) = self.inner.as_mut() {
-            return engine.sample_flows().await;
-        }
-        Ok(vec![])
-    }
+    async fn stop(&mut self) {}
 }
 
 struct ExternalEngine {
-    child: tokio::process::Child,
+    child: Option<tokio::process::Child>,
 }
 
 impl ExternalEngine {
-    async fn spawn(args: &WinNativeWorkerArgs) -> Result<Option<Self>> {
+    fn new() -> Self {
+        Self { child: None }
+    }
+
+    fn build_cmd_candidates() -> Vec<String> {
         let mut cmd_candidates = vec!["sshuttle-rs-windivert.exe".to_string()];
         if let Ok(env_cmd) = std::env::var("SSHUTTLE_RS_WINDIVERT_ENGINE")
             && !env_cmd.trim().is_empty()
         {
             cmd_candidates.insert(0, env_cmd);
         }
+        cmd_candidates
+    }
+}
 
-        for bin in cmd_candidates {
-            let mut cmd = Command::new(&bin);
-            cmd.arg("--listen-port")
+#[async_trait::async_trait]
+impl RuntimeEngine for ExternalEngine {
+    async fn start(&mut self, args: &WinNativeWorkerArgs) -> Result<()> {
+        for bin in Self::build_cmd_candidates() {
+            let mut cmd = tokio::process::Command::new(&bin);
+            cmd.arg("--listen-ip")
+                .arg(args.listen_ip.to_string())
+                .arg("--listen-port")
                 .arg(args.listen_port.to_string())
                 .arg("--proxy-addr")
                 .arg(args.proxy_addr.to_string());
@@ -255,126 +277,49 @@ impl ExternalEngine {
             if let Some(path) = &args.policy_file {
                 cmd.arg("--policy-file").arg(path);
             }
+            if args.dns_capture {
+                cmd.arg("--dns-capture").arg("true");
+            }
+            cmd.arg("--dns-listen-port")
+                .arg(args.dns_listen_port.to_string());
+            if args.udp_capture {
+                cmd.arg("--udp-capture").arg("true");
+            }
+            cmd.arg("--udp-listen-port")
+                .arg(args.udp_listen_port.to_string());
+            for p in &args.udp_ports {
+                cmd.arg("--udp-port").arg(p.to_string());
+            }
             cmd.stdin(Stdio::null())
                 .stdout(Stdio::inherit())
                 .stderr(Stdio::inherit());
 
-            match cmd.spawn() {
-                Ok(child) => {
-                    println!("[win-native-worker] using external engine binary: {}", bin);
-                    return Ok(Some(Self { child }));
-                }
-                Err(_) => continue,
+            if let Ok(child) = cmd.spawn() {
+                println!("[win-native-worker] using external engine binary: {}", bin);
+                self.child = Some(child);
+                return Ok(());
             }
         }
-
-        Ok(None)
-    }
-}
-
-#[async_trait::async_trait]
-impl DataplaneEngine for ExternalEngine {
-    async fn start(&mut self, _args: &WinNativeWorkerArgs) -> Result<()> {
-        Ok(())
+        anyhow::bail!("no external windivert engine available")
     }
 
-    async fn stop(&mut self) {
-        let _ = self.child.kill().await;
-        let _ = self.child.wait().await;
-    }
-
-    async fn sample_flows(&mut self) -> Result<Vec<FlowContext>> {
-        if let Some(status) = self.child.try_wait()? {
+    async fn tick(
+        &mut self,
+        _evaluator: Option<&mut PolicyEvaluator>,
+        _bypass_processes: &[String],
+    ) -> Result<Vec<PacketDecision>> {
+        if let Some(child) = self.child.as_mut()
+            && let Some(status) = child.try_wait()?
+        {
             anyhow::bail!("external engine exited unexpectedly: {status}");
         }
         Ok(vec![])
     }
-}
 
-struct BuiltinProbeEngine;
-
-#[async_trait::async_trait]
-impl DataplaneEngine for BuiltinProbeEngine {
-    async fn start(&mut self, _args: &WinNativeWorkerArgs) -> Result<()> {
-        Ok(())
-    }
-
-    async fn stop(&mut self) {}
-
-    async fn sample_flows(&mut self) -> Result<Vec<FlowContext>> {
-        sample_windows_tcp_flows().await
-    }
-}
-
-#[derive(Debug, Deserialize)]
-struct WinConnRow {
-    #[serde(rename = "ProcessName")]
-    process_name: Option<String>,
-    #[serde(rename = "ProcessPath")]
-    process_path: Option<String>,
-    #[serde(rename = "RemoteAddress")]
-    remote_address: Option<String>,
-    #[serde(rename = "RemotePort")]
-    remote_port: Option<u16>,
-}
-
-async fn sample_windows_tcp_flows() -> Result<Vec<FlowContext>> {
-    let script = r#"
-$rows = @()
-Get-NetTCPConnection -State Established -ErrorAction SilentlyContinue | ForEach-Object {
-  $proc = Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue
-  if ($null -ne $proc) {
-    $rows += [pscustomobject]@{
-      ProcessName = $proc.ProcessName
-      ProcessPath = $proc.Path
-      RemoteAddress = $_.RemoteAddress
-      RemotePort = $_.RemotePort
-    }
-  }
-}
-$rows | ConvertTo-Json -Compress
-"#;
-    let out = Command::new("powershell")
-        .args(["-NoProfile", "-Command", script])
-        .stdin(Stdio::null())
-        .output()
-        .await?;
-    if !out.status.success() {
-        return Ok(vec![]);
-    }
-    let text = String::from_utf8_lossy(&out.stdout).trim().to_string();
-    if text.is_empty() || text == "null" {
-        return Ok(vec![]);
-    }
-
-    let value: serde_json::Value = serde_json::from_str(&text)?;
-    let rows = if value.is_array() {
-        serde_json::from_value::<Vec<WinConnRow>>(value)?
-    } else {
-        vec![serde_json::from_value::<WinConnRow>(value)?]
-    };
-
-    let mut flows = Vec::new();
-    for row in rows {
-        let Some(addr) = row.remote_address else {
-            continue;
-        };
-        let Some(port) = row.remote_port else {
-            continue;
-        };
-        if addr == "127.0.0.1" || addr == "::1" || addr == "0.0.0.0" || addr == "::" {
-            continue;
+    async fn stop(&mut self) {
+        if let Some(child) = self.child.as_mut() {
+            let _ = child.kill().await;
+            let _ = child.wait().await;
         }
-        let Ok(ip) = addr.parse::<std::net::IpAddr>() else {
-            continue;
-        };
-        flows.push(FlowContext {
-            process_name: row.process_name,
-            process_path: row.process_path,
-            dst: std::net::SocketAddr::from((ip, port)),
-            proto: FlowProto::Tcp,
-        });
     }
-
-    Ok(flows)
 }

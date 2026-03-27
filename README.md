@@ -11,7 +11,7 @@ A Rust-based transparent proxy orchestrator that can convert an upstream proxy i
 - Linux bypass controls: `--bypass-uid`, `--bypass-gid`
 - Windows modes:
   - `system-proxy` (WinINET registry)
-  - `transparent` (built-in native worker with external WinDivert engine handoff)
+  - `transparent` (built-in native WinDivert dataplane, with external engine fallback)
 - DNS capture: optional (`--dns-capture`), SOCKS5 UDP path supported
 - Operations helpers: `doctor`, `cleanup`
 - Policy engine: JSON/YAML (`--policy-file`) + `explain` + `doctor --bypass-check-process`
@@ -70,6 +70,11 @@ cargo run -- run `
   --proxy-type socks5 `
   --policy-file .\\examples\\policy.sample.yaml
 ```
+
+Windows native dataplane dependency (required):
+- place `WinDivert.dll` and matching `WinDivert*.sys` beside `sshuttle-rs.exe`
+- or set build/runtime env to driver bundle path via `WINDIVERT_PATH`
+- run in elevated shell (Administrator)
 
 You can use either `json` or `yaml`; see:
 - `examples/policy.sample.yaml`
@@ -146,9 +151,17 @@ Build matrix:
 - Windows ARM64: `aarch64-pc-windows-msvc`
 - Windows 32-bit x86: `i686-pc-windows-msvc`
 
+Native packaging note:
+- Windows release artifact must include:
+  - `sshuttle-rs.exe`
+  - `WinDivert.dll`
+  - `WinDivert64.sys` (and architecture variants when applicable)
+
 ## Architecture
 
 - [Architecture (English)](docs/ARCHITECTURE_EN.md)
 - [架构说明（中文）](docs/ARCHITECTURE_CN.md)
 - [Policy Spec (English)](docs/POLICY_EN.md)
 - [Policy 规范（中文）](docs/POLICY_CN.md)
+- [Windows Native Dataplane (English)](docs/WINDOWS_NATIVE_EN.md)
+- [Windows 原生数据面说明（中文）](docs/WINDOWS_NATIVE_CN.md)

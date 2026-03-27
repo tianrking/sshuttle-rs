@@ -11,7 +11,7 @@
 - Linux 进程绕过：`--bypass-uid`、`--bypass-gid`
 - Windows 模式：
   - `system-proxy`（WinINET 注册表）
-  - `transparent`（内置 native worker，可自动接管外部 WinDivert 引擎）
+  - `transparent`（内置原生 WinDivert 数据面，外部引擎作为回退）
 - DNS 捕获：可选（`--dns-capture`），支持 SOCKS5 UDP 路径
 - 运维命令：`doctor`、`cleanup`
 - 策略引擎：JSON/YAML（`--policy-file`）+ `explain` + `doctor --bypass-check-process`
@@ -70,6 +70,11 @@ cargo run -- run `
   --proxy-type socks5 `
   --policy-file .\\examples\\policy.sample.yaml
 ```
+
+Windows 原生数据面依赖（必须）：
+- `sshuttle-rs.exe` 同目录放置 `WinDivert.dll` 与匹配的 `WinDivert*.sys`
+- 或通过 `WINDIVERT_PATH` 指向驱动文件目录
+- 需要管理员权限运行
 
 JSON 和 YAML 都支持，示例：
 - `examples/policy.sample.yaml`
@@ -146,9 +151,16 @@ Release 采用 tag (`v*`) 触发多架构构建。
 - Windows ARM64：`aarch64-pc-windows-msvc`
 - Windows 32-bit x86：`i686-pc-windows-msvc`
 
+Windows 发布包必须包含：
+- `sshuttle-rs.exe`
+- `WinDivert.dll`
+- `WinDivert64.sys`（以及对应架构版本）
+
 ## 架构文档
 
 - [Architecture (English)](docs/ARCHITECTURE_EN.md)
 - [架构说明（中文）](docs/ARCHITECTURE_CN.md)
 - [Policy Spec (English)](docs/POLICY_EN.md)
 - [Policy 规范（中文）](docs/POLICY_CN.md)
+- [Windows Native Dataplane (English)](docs/WINDOWS_NATIVE_EN.md)
+- [Windows 原生数据面说明（中文）](docs/WINDOWS_NATIVE_CN.md)

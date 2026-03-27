@@ -166,6 +166,8 @@ pub struct ExplainArgs {
 
 #[derive(Debug, clap::Args)]
 pub struct WinNativeWorkerArgs {
+    #[arg(long, default_value = "127.0.0.1")]
+    pub listen_ip: IpAddr,
     #[arg(long)]
     pub listen_port: u16,
     #[arg(long)]
@@ -174,6 +176,16 @@ pub struct WinNativeWorkerArgs {
     pub bypass_processes: Vec<String>,
     #[arg(long)]
     pub policy_file: Option<PathBuf>,
+    #[arg(long, default_value_t = false)]
+    pub dns_capture: bool,
+    #[arg(long, default_value_t = 15353)]
+    pub dns_listen_port: u16,
+    #[arg(long, default_value_t = false)]
+    pub udp_capture: bool,
+    #[arg(long, default_value_t = 19090)]
+    pub udp_listen_port: u16,
+    #[arg(long = "udp-port")]
+    pub udp_ports: Vec<u16>,
 }
 
 #[derive(Clone, Copy, Debug, ValueEnum)]

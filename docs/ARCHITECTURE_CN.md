@@ -19,7 +19,7 @@
   - 策略评估运行时钩子（决策 + 统计）
 - 平台面（Platform Plane）
   - Linux 后端（`iptables/ip6tables` + `nft`）
-  - Windows 后端（`system-proxy`、transparent native worker 路径）
+  - Windows 后端（`system-proxy`、transparent 原生 WinDivert 数据面路径）
 
 ## 可靠性原则
 
@@ -44,6 +44,7 @@
 - 基于平台重定向规则的全局 TCP 接管。
 - 上游协议：socks5/socks4/http。
 - Linux DNS 捕获（含 SOCKS5 UDP 路径）。
+- Windows 原生透明数据面支持 TCP + DNS/指定 UDP 重定向路径。
 - 多架构 CI + Release 发布流水线。
 
 ## 下一阶段

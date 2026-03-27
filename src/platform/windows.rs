@@ -370,6 +370,8 @@ fn built_in_worker_cmd(plan: &RulePlan) -> Result<String> {
     let mut parts = vec![
         quote_cmd_arg(exe.to_string_lossy().as_ref()),
         "win-native-worker".to_string(),
+        "--listen-ip".to_string(),
+        plan.listen_ip.to_string(),
         "--listen-port".to_string(),
         plan.listen_port.to_string(),
         "--proxy-addr".to_string(),
@@ -382,6 +384,22 @@ fn built_in_worker_cmd(plan: &RulePlan) -> Result<String> {
     if let Some(path) = &plan.policy_file {
         parts.push("--policy-file".to_string());
         parts.push(quote_cmd_arg(path.to_string_lossy().as_ref()));
+    }
+    if plan.dns_capture {
+        parts.push("--dns-capture".to_string());
+        parts.push("true".to_string());
+    }
+    parts.push("--dns-listen-port".to_string());
+    parts.push(plan.dns_listen_port.to_string());
+    if plan.udp_capture {
+        parts.push("--udp-capture".to_string());
+        parts.push("true".to_string());
+    }
+    parts.push("--udp-listen-port".to_string());
+    parts.push(plan.udp_listen_port.to_string());
+    for p in &plan.udp_ports {
+        parts.push("--udp-port".to_string());
+        parts.push(p.to_string());
     }
     Ok(parts.join(" "))
 }
