@@ -347,6 +347,8 @@ mod tests {
             proxy_type: ProxyTypeArg::Socks5,
             include_cidrs: vec!["0.0.0.0/0".to_string()],
             exclude_cidrs: vec![],
+            bypass_uids: vec![],
+            bypass_gids: vec![],
             dns_capture: false,
             dns_listen_ip: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
             dns_listen_port: 15353,

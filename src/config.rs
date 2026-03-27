@@ -48,6 +48,12 @@ pub struct RunArgs {
     #[arg(long = "exclude")]
     pub exclude_cidrs: Vec<String>,
 
+    #[arg(long = "bypass-uid")]
+    pub bypass_uids: Vec<u32>,
+
+    #[arg(long = "bypass-gid")]
+    pub bypass_gids: Vec<u32>,
+
     #[arg(long)]
     pub dry_run: bool,
 
@@ -139,6 +145,8 @@ pub struct RuntimeConfig {
     pub win_transparent_stop_cmd: Option<String>,
     pub include_cidrs: Vec<String>,
     pub exclude_cidrs: Vec<String>,
+    pub bypass_uids: Vec<u32>,
+    pub bypass_gids: Vec<u32>,
     pub dry_run: bool,
     pub no_apply_rules: bool,
     pub dns_capture: bool,
@@ -162,6 +170,8 @@ impl From<RunArgs> for RuntimeConfig {
             win_transparent_stop_cmd: value.win_transparent_stop_cmd,
             include_cidrs: value.include_cidrs,
             exclude_cidrs: value.exclude_cidrs,
+            bypass_uids: value.bypass_uids,
+            bypass_gids: value.bypass_gids,
             dry_run: value.dry_run,
             no_apply_rules: value.no_apply_rules,
             dns_capture: value.dns_capture,
@@ -210,6 +220,8 @@ pub struct RulePlan {
     pub proxy_type: ProxyTypeArg,
     pub include_cidrs: Vec<String>,
     pub exclude_cidrs: Vec<String>,
+    pub bypass_uids: Vec<u32>,
+    pub bypass_gids: Vec<u32>,
     pub dns_capture: bool,
     pub dns_listen_ip: IpAddr,
     pub dns_listen_port: u16,
@@ -235,6 +247,8 @@ impl RuntimeConfig {
             proxy_type: self.proxy_type,
             include_cidrs: self.include_cidrs.clone(),
             exclude_cidrs: excludes,
+            bypass_uids: self.bypass_uids.clone(),
+            bypass_gids: self.bypass_gids.clone(),
             dns_capture: self.dns_capture,
             dns_listen_ip: self.dns_listen.ip(),
             dns_listen_port: self.dns_listen.port(),
@@ -277,6 +291,8 @@ mod tests {
             win_transparent_stop_cmd: None,
             include_cidrs: vec!["0.0.0.0/0".to_string()],
             exclude_cidrs: vec![],
+            bypass_uids: vec![],
+            bypass_gids: vec![],
             dry_run: true,
             no_apply_rules: true,
             dns_capture: false,

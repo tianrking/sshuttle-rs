@@ -36,6 +36,22 @@ cargo run -- cleanup --mode transparent --platform auto --listen 127.0.0.1:18080
 sudo cargo run -- run --mode transparent --proxy 127.0.0.1:1080 --proxy-type socks5 --listen 127.0.0.1:18080
 ```
 
+Bypass specific process identities (critical for avoiding proxy-loop of `ss-local` itself):
+
+```bash
+sudo cargo run -- run \
+  --mode transparent \
+  --proxy 127.0.0.1:1080 \
+  --proxy-type socks5 \
+  --bypass-uid 1001 \
+  --bypass-gid 1001
+```
+
+Recommended pattern:
+- Run your `ss-local` under a dedicated Linux user (for example `ssproxy`).
+- Pass that UID/GID to `--bypass-uid/--bypass-gid`.
+- Then all other processes are transparently forwarded, but `ss-local` itself is bypassed safely.
+
 Use backend selection when needed:
 
 ```bash
@@ -99,6 +115,7 @@ Supported placeholders in command templates:
 ## Status
 
 - Linux backend: dual-stack (`iptables` + `ip6tables`) and `nft` selector.
+- Linux per-process bypass: supported via `--bypass-uid` / `--bypass-gid`.
 - Transparent TCP relay to upstream proxy: socks5/socks4/http supported.
 - Optional SSH dynamic tunnel bootstrap (`ssh -N -D`): implemented.
 - DNS capture (Linux): implemented (`udp/53` redirect + local DNS forwarder).

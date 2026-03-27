@@ -48,6 +48,8 @@ impl Platform for LinuxPlatform {
                     proxy_upstream: plan.proxy_upstream,
                     include_cidrs: &include_v4,
                     exclude_cidrs: &exclude_v4,
+                    bypass_uids: &plan.bypass_uids,
+                    bypass_gids: &plan.bypass_gids,
                     dns_capture: plan.dns_capture,
                     dns_listen_port: plan.dns_listen_port,
                 },
@@ -72,6 +74,8 @@ impl Platform for LinuxPlatform {
                         proxy_upstream: plan.proxy_upstream,
                         include_cidrs: &include_v6,
                         exclude_cidrs: &exclude_v6,
+                        bypass_uids: &plan.bypass_uids,
+                        bypass_gids: &plan.bypass_gids,
                         dns_capture: dns_capture_v6,
                         dns_listen_port: plan.dns_listen_port,
                     },
@@ -172,6 +176,41 @@ async fn apply_nft_rules(plan: &RulePlan, exec: &CommandExecutor) -> Result<()> 
         .await?;
     }
 
+    for uid in &plan.bypass_uids {
+        exec.run(
+            "nft",
+            [
+                "add",
+                "rule",
+                "inet",
+                table,
+                "output",
+                "meta",
+                "skuid",
+                &uid.to_string(),
+                "return",
+            ],
+        )
+        .await?;
+    }
+    for gid in &plan.bypass_gids {
+        exec.run(
+            "nft",
+            [
+                "add",
+                "rule",
+                "inet",
+                table,
+                "output",
+                "meta",
+                "skgid",
+                &gid.to_string(),
+                "return",
+            ],
+        )
+        .await?;
+    }
+
     for cidr in &plan.include_cidrs {
         let fam = if is_ipv6_cidr(cidr) { "ip6" } else { "ip" };
         exec.run(
@@ -232,6 +271,8 @@ struct FamilyRules<'a> {
     proxy_upstream: std::net::SocketAddr,
     include_cidrs: &'a [String],
     exclude_cidrs: &'a [String],
+    bypass_uids: &'a [u32],
+    bypass_gids: &'a [u32],
     dns_capture: bool,
     dns_listen_port: u16,
 }
@@ -246,6 +287,44 @@ async fn apply_family_rules(
     for cidr in cfg.exclude_cidrs {
         exec.run(cfg.cmd, ["-t", "nat", "-A", cfg.chain, "-d", cidr, "-j", "RETURN"])
             .await?;
+    }
+
+    for uid in cfg.bypass_uids {
+        exec.run(
+            cfg.cmd,
+            [
+                "-t",
+                "nat",
+                "-A",
+                cfg.chain,
+                "-m",
+                "owner",
+                "--uid-owner",
+                &uid.to_string(),
+                "-j",
+                "RETURN",
+            ],
+        )
+        .await?;
+    }
+
+    for gid in cfg.bypass_gids {
+        exec.run(
+            cfg.cmd,
+            [
+                "-t",
+                "nat",
+                "-A",
+                cfg.chain,
+                "-m",
+                "owner",
+                "--gid-owner",
+                &gid.to_string(),
+                "-j",
+                "RETURN",
+            ],
+        )
+        .await?;
     }
 
     exec.run(
