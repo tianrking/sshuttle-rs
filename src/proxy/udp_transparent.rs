@@ -1,4 +1,6 @@
-use anyhow::{Result, bail};
+use anyhow::Result;
+#[cfg(not(target_os = "linux"))]
+use anyhow::bail;
 
 #[cfg(target_os = "linux")]
 use anyhow::Context;
@@ -24,7 +26,7 @@ pub async fn run_udp_proxy(_listen: std::net::SocketAddr, _socks5_upstream: std:
 #[cfg(target_os = "linux")]
 fn blocking_loop(listen: std::net::SocketAddr, socks5_upstream: std::net::SocketAddr) -> Result<()> {
     use std::mem;
-    use std::net::{SocketAddr, UdpSocket};
+    use std::net::UdpSocket;
     use std::os::fd::AsRawFd;
 
     const IP_RECVORIGDSTADDR: i32 = 20;
@@ -93,7 +95,7 @@ fn sockaddr_storage_to_socket_addr(ss: &libc::sockaddr_storage, _len: libc::sock
         let sin = unsafe { &*(ss as *const _ as *const libc::sockaddr_in) };
         let ip = std::net::Ipv4Addr::from(u32::from_be(sin.sin_addr.s_addr));
         let port = u16::from_be(sin.sin_port);
-        return Some(SocketAddr::from((ip, port)));
+        return Some(std::net::SocketAddr::from((ip, port)));
     }
     None
 }
