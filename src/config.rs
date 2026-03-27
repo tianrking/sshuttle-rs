@@ -63,6 +63,9 @@ pub struct RunArgs {
 
     #[arg(long, value_enum, default_value_t = PlatformArg::Auto)]
     pub platform: PlatformArg,
+
+    #[arg(long, value_enum, default_value_t = LinuxBackendArg::Auto)]
+    pub linux_backend: LinuxBackendArg,
 }
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
@@ -76,6 +79,13 @@ pub enum PlatformArg {
 pub enum ModeArg {
     Transparent,
     SystemProxy,
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum)]
+pub enum LinuxBackendArg {
+    Auto,
+    Iptables,
+    Nft,
 }
 
 #[derive(Debug, Clone)]
@@ -96,6 +106,7 @@ pub struct RuntimeConfig {
     pub dns_upstream: SocketAddr,
     pub dns_via_socks: bool,
     pub requested_platform: PlatformArg,
+    pub linux_backend: LinuxBackendArg,
 }
 
 impl From<RunArgs> for RuntimeConfig {
@@ -117,6 +128,7 @@ impl From<RunArgs> for RuntimeConfig {
             dns_upstream: value.dns_upstream,
             dns_via_socks: value.dns_via_socks,
             requested_platform: value.platform,
+            linux_backend: value.linux_backend,
         }
     }
 }
@@ -134,6 +146,7 @@ pub struct RulePlan {
     pub dns_listen_port: u16,
     pub win_transparent_cmd: Option<String>,
     pub win_transparent_stop_cmd: Option<String>,
+    pub linux_backend: LinuxBackendArg,
 }
 
 impl RuntimeConfig {
@@ -157,6 +170,7 @@ impl RuntimeConfig {
             dns_listen_port: self.dns_listen.port(),
             win_transparent_cmd: self.win_transparent_cmd.clone(),
             win_transparent_stop_cmd: self.win_transparent_stop_cmd.clone(),
+            linux_backend: self.linux_backend,
         }
     }
 }

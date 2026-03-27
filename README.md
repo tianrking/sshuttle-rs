@@ -17,6 +17,12 @@ cargo run -- run --mode transparent --socks5 127.0.0.1:1080 --listen 127.0.0.1:1
 sudo cargo run -- run --mode transparent --socks5 127.0.0.1:1080 --listen 127.0.0.1:18080
 ```
 
+Use backend selection when needed:
+
+```bash
+sudo cargo run -- run --mode transparent --linux-backend nft
+```
+
 ## Linux transparent mode with built-in SSH dynamic tunnel
 
 ```bash
@@ -70,6 +76,7 @@ Supported placeholders in command templates:
 
 - Linux backend: implemented (iptables OUTPUT redirect chain).
 - Linux backend: dual-stack rule engine (`iptables` + `ip6tables`).
+- Linux backend selector: `auto | iptables | nft`.
 - Transparent TCP relay to SOCKS5: implemented.
 - Optional SSH dynamic tunnel bootstrap (`ssh -N -D`): implemented.
 - DNS capture (Linux): implemented (`udp/53` redirect + local DNS forwarder).
