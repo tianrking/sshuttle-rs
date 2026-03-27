@@ -50,9 +50,9 @@ jobs:
         include:
           - target: aarch64-pc-windows-msvc
             experimental: false
-          - target: thumbv7a-pc-windows-msvc
-            experimental: true
-    continue-on-error: ${{ matrix.experimental }}
+          - target: i686-pc-windows-msvc
+            experimental: false
+    continue-on-error: false
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable

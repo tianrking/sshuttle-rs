@@ -140,6 +140,9 @@ CI runs `cargo check`, `cargo test`, and `cargo clippy -D warnings` on push/PR.
 - Linux ARM32: `armv7-unknown-linux-gnueabihf`
 - Windows AMD64: `x86_64-pc-windows-msvc`
 - Windows ARM64: `aarch64-pc-windows-msvc`
-- Windows ARM32 (experimental): `thumbv7a-pc-windows-msvc`
+- Windows 32-bit x86: `i686-pc-windows-msvc`
+
+Note: Rust stable currently does not provide `rust-std` for `thumbv7a-pc-windows-msvc`,
+so Windows ARM32 release artifacts are temporarily disabled in CI/release workflows.
 
 Tagging `v*` triggers release artifact builds for the matrix above.

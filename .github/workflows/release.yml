@@ -39,10 +39,10 @@ jobs:
             archive: zip
             experimental: false
           - os: windows-latest
-            target: thumbv7a-pc-windows-msvc
+            target: i686-pc-windows-msvc
             use_cross: false
             archive: zip
-            experimental: true
+            experimental: false
     continue-on-error: ${{ matrix.experimental }}
     runs-on: ${{ matrix.os }}
     env:
