@@ -38,16 +38,19 @@ impl Platform for LinuxPlatform {
             plan.exclude_cidrs.iter().cloned().partition(|c| !is_ipv6_cidr(c));
 
         if !include_v4.is_empty() {
+            let chain_v4 = chain_name_v4(plan.listen_port);
             apply_family_rules(
                 exec,
-                "iptables",
-                &chain_name_v4(plan.listen_port),
-                plan.listen_port,
-                plan.socks_upstream,
-                &include_v4,
-                &exclude_v4,
-                plan.dns_capture,
-                plan.dns_listen_port,
+                FamilyRules {
+                    cmd: "iptables",
+                    chain: &chain_v4,
+                    listen_port: plan.listen_port,
+                    socks_upstream: plan.socks_upstream,
+                    include_cidrs: &include_v4,
+                    exclude_cidrs: &exclude_v4,
+                    dns_capture: plan.dns_capture,
+                    dns_listen_port: plan.dns_listen_port,
+                },
             )
             .await?;
         }
@@ -59,16 +62,19 @@ impl Platform for LinuxPlatform {
                 );
             } else {
                 let dns_capture_v6 = plan.dns_capture && plan.dns_listen_ip.is_ipv6();
+                let chain_v6 = chain_name_v6(plan.listen_port);
                 apply_family_rules(
                     exec,
-                    "ip6tables",
-                    &chain_name_v6(plan.listen_port),
-                    plan.listen_port,
-                    plan.socks_upstream,
-                    &include_v6,
-                    &exclude_v6,
-                    dns_capture_v6,
-                    plan.dns_listen_port,
+                    FamilyRules {
+                        cmd: "ip6tables",
+                        chain: &chain_v6,
+                        listen_port: plan.listen_port,
+                        socks_upstream: plan.socks_upstream,
+                        include_cidrs: &include_v6,
+                        exclude_cidrs: &exclude_v6,
+                        dns_capture: dns_capture_v6,
+                        dns_listen_port: plan.dns_listen_port,
+                    },
                 )
                 .await?;
             }
@@ -219,52 +225,56 @@ async fn cleanup_nft_rules(exec: &CommandExecutor) -> Result<()> {
     Ok(())
 }
 
-async fn apply_family_rules(
-    exec: &CommandExecutor,
-    cmd: &str,
-    chain: &str,
+struct FamilyRules<'a> {
+    cmd: &'a str,
+    chain: &'a str,
     listen_port: u16,
     socks_upstream: std::net::SocketAddr,
-    include_cidrs: &[String],
-    exclude_cidrs: &[String],
+    include_cidrs: &'a [String],
+    exclude_cidrs: &'a [String],
     dns_capture: bool,
     dns_listen_port: u16,
-) -> Result<()> {
-    exec.run(cmd, ["-t", "nat", "-N", chain]).await.ok();
-    exec.run(cmd, ["-t", "nat", "-F", chain]).await?;
+}
 
-    for cidr in exclude_cidrs {
-        exec.run(cmd, ["-t", "nat", "-A", chain, "-d", cidr, "-j", "RETURN"])
+async fn apply_family_rules(
+    exec: &CommandExecutor,
+    cfg: FamilyRules<'_>,
+) -> Result<()> {
+    exec.run(cfg.cmd, ["-t", "nat", "-N", cfg.chain]).await.ok();
+    exec.run(cfg.cmd, ["-t", "nat", "-F", cfg.chain]).await?;
+
+    for cidr in cfg.exclude_cidrs {
+        exec.run(cfg.cmd, ["-t", "nat", "-A", cfg.chain, "-d", cidr, "-j", "RETURN"])
             .await?;
     }
 
     exec.run(
-        cmd,
+        cfg.cmd,
         [
             "-t",
             "nat",
             "-A",
-            chain,
+            cfg.chain,
             "-d",
-            &single_host_cidr(socks_upstream.ip()),
+            &single_host_cidr(cfg.socks_upstream.ip()),
             "-p",
             "tcp",
             "--dport",
-            &socks_upstream.port().to_string(),
+            &cfg.socks_upstream.port().to_string(),
             "-j",
             "RETURN",
         ],
     )
     .await?;
 
-    for cidr in include_cidrs {
+    for cidr in cfg.include_cidrs {
         exec.run(
-            cmd,
+            cfg.cmd,
             [
                 "-t",
                 "nat",
                 "-A",
-                chain,
+                cfg.chain,
                 "-p",
                 "tcp",
                 "-d",
@@ -272,19 +282,19 @@ async fn apply_family_rules(
                 "-j",
                 "REDIRECT",
                 "--to-ports",
-                &listen_port.to_string(),
+                &cfg.listen_port.to_string(),
             ],
         )
         .await?;
 
-        if dns_capture {
+        if cfg.dns_capture {
             exec.run(
-                cmd,
+                cfg.cmd,
                 [
                     "-t",
                     "nat",
                     "-A",
-                    chain,
+                    cfg.chain,
                     "-p",
                     "udp",
                     "--dport",
@@ -294,24 +304,24 @@ async fn apply_family_rules(
                     "-j",
                     "REDIRECT",
                     "--to-ports",
-                    &dns_listen_port.to_string(),
+                    &cfg.dns_listen_port.to_string(),
                 ],
             )
             .await?;
         }
     }
 
-    exec.run(cmd, ["-t", "nat", "-C", "OUTPUT", "-p", "tcp", "-j", chain])
+    exec.run(cfg.cmd, ["-t", "nat", "-C", "OUTPUT", "-p", "tcp", "-j", cfg.chain])
         .await
         .ok();
-    exec.run(cmd, ["-t", "nat", "-A", "OUTPUT", "-p", "tcp", "-j", chain])
+    exec.run(cfg.cmd, ["-t", "nat", "-A", "OUTPUT", "-p", "tcp", "-j", cfg.chain])
         .await
         .ok();
 
-    if dns_capture {
+    if cfg.dns_capture {
         exec.run(
-            cmd,
-            ["-t", "nat", "-A", "OUTPUT", "-p", "udp", "--dport", "53", "-j", chain],
+            cfg.cmd,
+            ["-t", "nat", "-A", "OUTPUT", "-p", "udp", "--dport", "53", "-j", cfg.chain],
         )
         .await
         .ok();

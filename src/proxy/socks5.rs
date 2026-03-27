@@ -195,3 +195,32 @@ fn parse_udp_header_len(buf: &[u8]) -> Result<usize> {
     }
     Ok(header_len)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::parse_udp_header_len;
+
+    #[test]
+    fn udp_header_len_ipv4() {
+        let mut p = vec![0x00, 0x00, 0x00, 0x01];
+        p.extend_from_slice(&[1, 2, 3, 4, 0x00, 0x35]);
+        p.extend_from_slice(&[0xaa, 0xbb]);
+        let len = parse_udp_header_len(&p).expect("valid header");
+        assert_eq!(len, 10);
+    }
+
+    #[test]
+    fn udp_header_len_domain() {
+        let mut p = vec![0x00, 0x00, 0x00, 0x03, 0x0b];
+        p.extend_from_slice(b"example.org");
+        p.extend_from_slice(&[0x00, 0x35, 0xcc]);
+        let len = parse_udp_header_len(&p).expect("valid domain header");
+        assert_eq!(len, 18);
+    }
+
+    #[test]
+    fn udp_header_fragment_not_supported() {
+        let p = [0x00, 0x00, 0x01, 0x01, 127, 0, 0, 1, 0, 53];
+        assert!(parse_udp_header_len(&p).is_err());
+    }
+}

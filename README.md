@@ -97,3 +97,5 @@ Supported placeholders in command templates:
   - transparent mode: worker-command bridge implemented; native WinDivert/WFP backend is next.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for architecture and roadmap.
+
+CI runs `cargo check`, `cargo test`, and `cargo clippy -D warnings` on push/PR.

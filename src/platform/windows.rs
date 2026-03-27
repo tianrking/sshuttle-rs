@@ -321,3 +321,38 @@ fn render_transparent_cmd(tpl: &str, plan: &RulePlan) -> String {
 fn escape_for_single_quote(s: &str) -> String {
     s.replace('\'', "''")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::render_transparent_cmd;
+    use crate::config::{LinuxBackendArg, ModeArg, RulePlan};
+    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+
+    fn sample_plan() -> RulePlan {
+        RulePlan {
+            mode: ModeArg::Transparent,
+            listen_ip: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+            listen_port: 18080,
+            socks_upstream: SocketAddr::from((Ipv4Addr::new(127, 0, 0, 1), 1080)),
+            include_cidrs: vec!["0.0.0.0/0".to_string()],
+            exclude_cidrs: vec![],
+            dns_capture: false,
+            dns_listen_ip: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+            dns_listen_port: 15353,
+            win_transparent_cmd: None,
+            win_transparent_stop_cmd: None,
+            linux_backend: LinuxBackendArg::Auto,
+        }
+    }
+
+    #[test]
+    fn render_cmd_replaces_placeholders() {
+        let p = sample_plan();
+        let out = render_transparent_cmd(
+            "worker --listen {listen_port} --socks {socks_host}:{socks_port} --all {socks_addr}",
+            &p,
+        );
+        assert!(out.contains("18080"));
+        assert!(out.contains("127.0.0.1:1080"));
+    }
+}

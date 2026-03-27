@@ -239,3 +239,36 @@ fn single_host_cidr(ip: IpAddr) -> String {
         IpAddr::V6(v6) => format!("{v6}/128"),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{LinuxBackendArg, ModeArg, PlatformArg, RunArgs, RuntimeConfig};
+    use std::net::{Ipv4Addr, SocketAddr};
+
+    #[test]
+    fn to_rule_plan_adds_loopback_and_socks_excludes() {
+        let args = RunArgs {
+            mode: ModeArg::Transparent,
+            listen: SocketAddr::from((Ipv4Addr::new(127, 0, 0, 1), 18080)),
+            socks5: SocketAddr::from((Ipv4Addr::new(127, 0, 0, 1), 1080)),
+            ssh_remote: None,
+            ssh_cmd: "ssh".to_string(),
+            win_transparent_cmd: None,
+            win_transparent_stop_cmd: None,
+            include_cidrs: vec!["0.0.0.0/0".to_string()],
+            exclude_cidrs: vec![],
+            dry_run: true,
+            no_apply_rules: true,
+            dns_capture: false,
+            dns_listen: SocketAddr::from((Ipv4Addr::new(127, 0, 0, 1), 15353)),
+            dns_upstream: SocketAddr::from((Ipv4Addr::new(1, 1, 1, 1), 53)),
+            dns_via_socks: true,
+            platform: PlatformArg::Auto,
+            linux_backend: LinuxBackendArg::Auto,
+        };
+        let cfg: RuntimeConfig = args.into();
+        let plan = cfg.to_rule_plan();
+        assert!(plan.exclude_cidrs.iter().any(|c| c == "127.0.0.0/8"));
+        assert!(plan.exclude_cidrs.iter().any(|c| c == "127.0.0.1/32"));
+    }
+}
