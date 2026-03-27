@@ -21,6 +21,19 @@ A Rust-based transparent proxy orchestrator that can convert an upstream proxy i
 cargo run -- run --mode transparent --proxy 127.0.0.1:1080 --proxy-type socks5 --listen 127.0.0.1:18080
 ```
 
+UDP capture (non-DNS) example on Linux:
+
+```bash
+sudo cargo run -- run \
+  --mode transparent \
+  --proxy 127.0.0.1:1080 \
+  --proxy-type socks5 \
+  --udp-capture \
+  --udp-listen 127.0.0.1:19090 \
+  --udp-port 443 \
+  --udp-port 3478
+```
+
 ## Process Bypass (Any Program)
 
 Linux (kernel-level owner match):
@@ -73,6 +86,7 @@ cargo run -- cleanup --mode transparent --platform auto --listen 127.0.0.1:18080
 | Transparent TCP redirect | Yes | Yes (native worker minimal / external worker) |
 | Per-process bypass | Yes (`uid/gid`) | Yes (`--bypass-process` in transparent mode) |
 | DNS capture | Yes | Depends on transparent backend worker/native dataplane |
+| UDP capture (non-DNS) | Linux first version (SOCKS5 upstream + selected UDP ports) | Planned in native WinDivert/WFP dataplane |
 | Upstream socks5/socks4/http | Yes | Yes |
 
 ## CI / Release

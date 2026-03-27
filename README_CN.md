@@ -21,6 +21,19 @@
 cargo run -- run --mode transparent --proxy 127.0.0.1:1080 --proxy-type socks5 --listen 127.0.0.1:18080
 ```
 
+Linux 下的 UDP 非 DNS 捕获示例：
+
+```bash
+sudo cargo run -- run \
+  --mode transparent \
+  --proxy 127.0.0.1:1080 \
+  --proxy-type socks5 \
+  --udp-capture \
+  --udp-listen 127.0.0.1:19090 \
+  --udp-port 443 \
+  --udp-port 3478
+```
+
 ## 任意程序绕过
 
 Linux（内核 owner 规则，稳定可靠）：
@@ -73,6 +86,7 @@ cargo run -- cleanup --mode transparent --platform auto --listen 127.0.0.1:18080
 | 透明 TCP 重定向 | 支持 | 支持（内置 worker 最小版 / 外部 worker） |
 | 按程序绕过 | 支持（uid/gid） | 支持（transparent 模式 `--bypass-process`） |
 | DNS 捕获 | 支持 | 取决于 transparent worker/native dataplane |
+| UDP 捕获（非 DNS） | Linux 首版可用（socks5 上游 + 指定 UDP 端口） | 计划在 WinDivert/WFP native dataplane 中实现 |
 | 上游 socks5/socks4/http | 支持 | 支持 |
 
 ## CI / Release

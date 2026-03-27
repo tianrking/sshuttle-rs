@@ -82,6 +82,15 @@ pub struct RunArgs {
 
     #[arg(long, value_enum, default_value_t = LinuxBackendArg::Auto)]
     pub linux_backend: LinuxBackendArg,
+
+    #[arg(long)]
+    pub udp_capture: bool,
+
+    #[arg(long, default_value = "127.0.0.1:19090")]
+    pub udp_listen: SocketAddr,
+
+    #[arg(long = "udp-port")]
+    pub udp_ports: Vec<u16>,
 }
 
 #[derive(Debug, clap::Args)]
@@ -171,6 +180,9 @@ pub struct RuntimeConfig {
     pub dns_via_socks: bool,
     pub requested_platform: PlatformArg,
     pub linux_backend: LinuxBackendArg,
+    pub udp_capture: bool,
+    pub udp_listen: SocketAddr,
+    pub udp_ports: Vec<u16>,
 }
 
 impl From<RunArgs> for RuntimeConfig {
@@ -197,6 +209,9 @@ impl From<RunArgs> for RuntimeConfig {
             dns_via_socks: value.dns_via_socks,
             requested_platform: value.platform,
             linux_backend: value.linux_backend,
+            udp_capture: value.udp_capture,
+            udp_listen: value.udp_listen,
+            udp_ports: value.udp_ports,
         }
     }
 }
@@ -246,6 +261,10 @@ pub struct RulePlan {
     pub win_transparent_cmd: Option<String>,
     pub win_transparent_stop_cmd: Option<String>,
     pub linux_backend: LinuxBackendArg,
+    pub udp_capture: bool,
+    pub udp_listen_ip: IpAddr,
+    pub udp_listen_port: u16,
+    pub udp_ports: Vec<u16>,
 }
 
 impl RuntimeConfig {
@@ -274,6 +293,10 @@ impl RuntimeConfig {
             win_transparent_cmd: self.win_transparent_cmd.clone(),
             win_transparent_stop_cmd: self.win_transparent_stop_cmd.clone(),
             linux_backend: self.linux_backend,
+            udp_capture: self.udp_capture,
+            udp_listen_ip: self.udp_listen.ip(),
+            udp_listen_port: self.udp_listen.port(),
+            udp_ports: self.udp_ports.clone(),
         }
     }
 }
@@ -321,6 +344,9 @@ mod tests {
             dns_via_socks: true,
             platform: PlatformArg::Auto,
             linux_backend: LinuxBackendArg::Auto,
+            udp_capture: false,
+            udp_listen: SocketAddr::from((Ipv4Addr::new(127, 0, 0, 1), 19090)),
+            udp_ports: vec![],
         };
         let cfg: RuntimeConfig = args.into();
         let plan = cfg.to_rule_plan();

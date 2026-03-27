@@ -394,6 +394,10 @@ mod tests {
             win_transparent_cmd: None,
             win_transparent_stop_cmd: None,
             linux_backend: LinuxBackendArg::Auto,
+            udp_capture: false,
+            udp_listen_ip: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+            udp_listen_port: 19090,
+            udp_ports: vec![],
         }
     }
 

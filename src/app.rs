@@ -6,7 +6,7 @@ use tokio::{process::Child, process::Command as TokioCommand, time::Duration};
 use crate::config::{Cli, Command, ModeArg, ProxyTypeArg, RuntimeConfig};
 use crate::doctor;
 use crate::platform::{build_platform, CommandExecutor};
-use crate::proxy::{DnsProxy, TransparentProxy};
+use crate::proxy::{DnsProxy, TransparentProxy, UdpTransparentProxy};
 use crate::win_native;
 
 pub async fn run(cli: Cli) -> Result<()> {
@@ -57,6 +57,19 @@ async fn run_mode(cfg: RuntimeConfig) -> Result<()> {
                 }
                 let dns = DnsProxy::new(cfg.dns_listen, cfg.dns_upstream, cfg.proxy, via_socks);
                 run_tasks.push(tokio::spawn(async move { dns.run().await }));
+            }
+
+            if cfg.udp_capture {
+                if cfg.proxy_type != ProxyTypeArg::Socks5 {
+                    println!(
+                        "[warn] udp capture currently requires socks5 upstream; skip udp capture"
+                    );
+                } else if platform.name().starts_with("linux/") {
+                    let udp = UdpTransparentProxy::new(cfg.udp_listen, cfg.proxy);
+                    run_tasks.push(tokio::spawn(async move { udp.run().await }));
+                } else {
+                    println!("[warn] udp capture runtime currently implemented for linux only");
+                }
             }
         }
         ModeArg::SystemProxy => {

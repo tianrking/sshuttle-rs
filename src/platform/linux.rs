@@ -52,6 +52,9 @@ impl Platform for LinuxPlatform {
                     bypass_gids: &plan.bypass_gids,
                     dns_capture: plan.dns_capture,
                     dns_listen_port: plan.dns_listen_port,
+                    udp_capture: plan.udp_capture,
+                    udp_ports: &plan.udp_ports,
+                    udp_listen_port: plan.udp_listen_port,
                 },
             )
             .await?;
@@ -78,6 +81,9 @@ impl Platform for LinuxPlatform {
                         bypass_gids: &plan.bypass_gids,
                         dns_capture: dns_capture_v6,
                         dns_listen_port: plan.dns_listen_port,
+                        udp_capture: plan.udp_capture && plan.udp_listen_ip.is_ipv6(),
+                        udp_ports: &plan.udp_ports,
+                        udp_listen_port: plan.udp_listen_port,
                     },
                 )
                 .await?;
@@ -102,6 +108,8 @@ impl Platform for LinuxPlatform {
             "iptables",
             &chain_name_v4(plan.listen_port),
             plan.dns_capture,
+            plan.udp_capture,
+            &plan.udp_ports,
         )
         .await?;
 
@@ -111,6 +119,8 @@ impl Platform for LinuxPlatform {
             "ip6tables",
             &chain_name_v6(plan.listen_port),
             dns_capture_v6,
+            plan.udp_capture && plan.udp_listen_ip.is_ipv6(),
+            &plan.udp_ports,
         )
         .await?;
 
@@ -253,6 +263,31 @@ async fn apply_nft_rules(plan: &RulePlan, exec: &CommandExecutor) -> Result<()> 
             )
             .await?;
         }
+
+        if plan.udp_capture {
+            for port in &plan.udp_ports {
+                exec.run(
+                    "nft",
+                    [
+                        "add",
+                        "rule",
+                        "inet",
+                        table,
+                        "output",
+                        fam,
+                        "daddr",
+                        cidr,
+                        "udp",
+                        "dport",
+                        &port.to_string(),
+                        "redirect",
+                        "to",
+                        &plan.udp_listen_port.to_string(),
+                    ],
+                )
+                .await?;
+            }
+        }
     }
     Ok(())
 }
@@ -275,6 +310,9 @@ struct FamilyRules<'a> {
     bypass_gids: &'a [u32],
     dns_capture: bool,
     dns_listen_port: u16,
+    udp_capture: bool,
+    udp_ports: &'a [u16],
+    udp_listen_port: u16,
 }
 
 async fn apply_family_rules(
@@ -388,6 +426,31 @@ async fn apply_family_rules(
             )
             .await?;
         }
+
+        if cfg.udp_capture {
+            for port in cfg.udp_ports {
+                exec.run(
+                    cfg.cmd,
+                    [
+                        "-t",
+                        "nat",
+                        "-A",
+                        cfg.chain,
+                        "-p",
+                        "udp",
+                        "--dport",
+                        &port.to_string(),
+                        "-d",
+                        cidr,
+                        "-j",
+                        "REDIRECT",
+                        "--to-ports",
+                        &cfg.udp_listen_port.to_string(),
+                    ],
+                )
+                .await?;
+            }
+        }
     }
 
     exec.run(cfg.cmd, ["-t", "nat", "-C", "OUTPUT", "-p", "tcp", "-j", cfg.chain])
@@ -406,6 +469,28 @@ async fn apply_family_rules(
         .ok();
     }
 
+    if cfg.udp_capture {
+        for port in cfg.udp_ports {
+            exec.run(
+                cfg.cmd,
+                [
+                    "-t",
+                    "nat",
+                    "-A",
+                    "OUTPUT",
+                    "-p",
+                    "udp",
+                    "--dport",
+                    &port.to_string(),
+                    "-j",
+                    cfg.chain,
+                ],
+            )
+            .await
+            .ok();
+        }
+    }
+
     Ok(())
 }
 
@@ -414,6 +499,8 @@ async fn cleanup_family_rules(
     cmd: &str,
     chain: &str,
     dns_capture: bool,
+    udp_capture: bool,
+    udp_ports: &[u16],
 ) -> Result<()> {
     exec.run(cmd, ["-t", "nat", "-D", "OUTPUT", "-p", "tcp", "-j", chain])
         .await
@@ -426,6 +513,28 @@ async fn cleanup_family_rules(
         )
         .await
         .ok();
+    }
+
+    if udp_capture {
+        for port in udp_ports {
+            exec.run(
+                cmd,
+                [
+                    "-t",
+                    "nat",
+                    "-D",
+                    "OUTPUT",
+                    "-p",
+                    "udp",
+                    "--dport",
+                    &port.to_string(),
+                    "-j",
+                    chain,
+                ],
+            )
+            .await
+            .ok();
+        }
     }
 
     exec.run(cmd, ["-t", "nat", "-F", chain]).await.ok();

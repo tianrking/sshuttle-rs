@@ -3,6 +3,7 @@ mod http_connect;
 mod original_dst;
 mod socks4;
 mod socks5;
+mod udp_transparent;
 
 use anyhow::{Context, Result};
 use tokio::net::{TcpListener, TcpStream};
@@ -19,6 +20,21 @@ pub struct DnsProxy {
     upstream: std::net::SocketAddr,
     proxy_addr: std::net::SocketAddr,
     via_socks: bool,
+}
+
+pub struct UdpTransparentProxy {
+    listen: std::net::SocketAddr,
+    socks5: std::net::SocketAddr,
+}
+
+impl UdpTransparentProxy {
+    pub fn new(listen: std::net::SocketAddr, socks5: std::net::SocketAddr) -> Self {
+        Self { listen, socks5 }
+    }
+
+    pub async fn run(self) -> Result<()> {
+        udp_transparent::run_udp_proxy(self.listen, self.socks5).await
+    }
 }
 
 impl DnsProxy {
