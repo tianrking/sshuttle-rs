@@ -24,6 +24,7 @@ cargo run -- run --mode system-proxy --platform windows --socks5 127.0.0.1:1080
 ```
 
 Stop with Ctrl+C; cleanup will restore registry proxy settings.
+The app now snapshots previous `ProxyEnable/ProxyServer` and restores them on exit.
 
 ## Status
 

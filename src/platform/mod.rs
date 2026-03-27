@@ -1,5 +1,5 @@
 use std::ffi::OsStr;
-use std::process::Stdio;
+use std::process::{Output, Stdio};
 
 use anyhow::{Context, Result, bail};
 use async_trait::async_trait;
@@ -47,6 +47,35 @@ impl CommandExecutor {
         }
 
         Ok(())
+    }
+
+    pub async fn capture<I, S>(&self, program: &str, args: I) -> Result<String>
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<OsStr>,
+    {
+        let args_vec: Vec<String> = args
+            .into_iter()
+            .map(|s| s.as_ref().to_string_lossy().to_string())
+            .collect();
+
+        if self.dry_run {
+            println!("[dry-run] {} {}", program, args_vec.join(" "));
+            return Ok(String::new());
+        }
+
+        let output: Output = tokio::process::Command::new(program)
+            .args(&args_vec)
+            .stdin(Stdio::null())
+            .output()
+            .await
+            .with_context(|| format!("failed to run command: {}", program))?;
+
+        if !output.status.success() {
+            bail!("command failed: {} {}", program, args_vec.join(" "));
+        }
+
+        Ok(String::from_utf8_lossy(&output.stdout).to_string())
     }
 }
 
