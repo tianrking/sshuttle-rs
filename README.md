@@ -36,7 +36,7 @@ cargo run -- cleanup --mode transparent --platform auto --listen 127.0.0.1:18080
 sudo cargo run -- run --mode transparent --proxy 127.0.0.1:1080 --proxy-type socks5 --listen 127.0.0.1:18080
 ```
 
-Bypass specific process identities (critical for avoiding proxy-loop of `ss-local` itself):
+Bypass specific process identities (critical for avoiding proxy-loop of your upstream proxy program itself):
 
 ```bash
 sudo cargo run -- run \
@@ -48,9 +48,9 @@ sudo cargo run -- run \
 ```
 
 Recommended pattern:
-- Run your `ss-local` under a dedicated Linux user (for example `ssproxy`).
+- Run your upstream proxy daemon under a dedicated Linux user (for example `proxydaemon`).
 - Pass that UID/GID to `--bypass-uid/--bypass-gid`.
-- Then all other processes are transparently forwarded, but `ss-local` itself is bypassed safely.
+- Then all other processes are transparently forwarded, but that daemon itself is bypassed safely.
 
 Use backend selection when needed:
 
@@ -102,7 +102,9 @@ cargo run -- run `
   --platform windows `
   --proxy 127.0.0.1:1080 `
   --proxy-type socks5 `
-  --win-transparent-cmd "my-windivert-worker.exe --listen {listen_port} --proxy {proxy_addr}"
+  --bypass-process "my-proxy.exe" `
+  --bypass-process "another-daemon.exe" `
+  --win-transparent-cmd "my-windivert-worker.exe --listen {listen_port} --proxy {proxy_addr} --bypass {bypass_processes_csv}"
 ```
 
 Supported placeholders in command templates:
@@ -110,6 +112,8 @@ Supported placeholders in command templates:
 - `{proxy_host}`
 - `{proxy_port}`
 - `{proxy_addr}`
+- `{bypass_processes_csv}`
+- `{bypass_processes_semicolon}`
 - `{socks_host}` / `{socks_port}` / `{socks_addr}` (compat aliases)
 
 ## Status

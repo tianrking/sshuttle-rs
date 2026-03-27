@@ -25,6 +25,11 @@ impl Platform for WindowsPlatform {
         match plan.mode {
             ModeArg::Transparent => apply_transparent_worker(plan, exec).await,
             ModeArg::SystemProxy => {
+                if !plan.bypass_processes.is_empty() {
+                    println!(
+                        "[warn] windows system-proxy mode cannot enforce per-process bypass list; use transparent mode worker/native backend"
+                    );
+                }
                 let proxy = match plan.proxy_type {
                     ProxyTypeArg::Socks5 | ProxyTypeArg::Socks4 => {
                         format!("socks={}:{}", plan.proxy_upstream.ip(), plan.proxy_upstream.port())
@@ -130,11 +135,17 @@ Example: --win-transparent-cmd \"my-windivert-worker.exe --listen {{listen_port}
         )
     })?;
     let rendered = render_transparent_cmd(cmd_tpl, plan);
+    let with_env = if plan.bypass_processes.is_empty() {
+        rendered.clone()
+    } else {
+        let env_value = plan.bypass_processes.join(";");
+        format!("set SSHUTTLE_RS_BYPASS_PROCESSES={env_value}&& {rendered}")
+    };
     let ps_script = format!(
         "$p = Start-Process -FilePath 'cmd.exe' -ArgumentList '/C {}' -PassThru -WindowStyle Hidden; \
 Set-Content -Path '{}' -Value $p.Id; \
 Write-Output $p.Id",
-        escape_for_single_quote(&rendered),
+        escape_for_single_quote(&with_env),
         worker_pid_file_path().display()
     );
     let pid = exec
@@ -143,7 +154,7 @@ Write-Output $p.Id",
     println!(
         "[info] windows transparent worker started (pid={}) with command: {}",
         pid.trim(),
-        rendered
+        with_env
     );
     Ok(())
 }
@@ -319,10 +330,14 @@ fn worker_pid_file_path() -> PathBuf {
 }
 
 fn render_transparent_cmd(tpl: &str, plan: &RulePlan) -> String {
+    let bypass_csv = plan.bypass_processes.join(",");
+    let bypass_semicolon = plan.bypass_processes.join(";");
     tpl.replace("{listen_port}", &plan.listen_port.to_string())
         .replace("{proxy_host}", &plan.proxy_upstream.ip().to_string())
         .replace("{proxy_port}", &plan.proxy_upstream.port().to_string())
         .replace("{proxy_addr}", &plan.proxy_upstream.to_string())
+        .replace("{bypass_processes_csv}", &bypass_csv)
+        .replace("{bypass_processes_semicolon}", &bypass_semicolon)
         .replace("{socks_host}", &plan.proxy_upstream.ip().to_string())
         .replace("{socks_port}", &plan.proxy_upstream.port().to_string())
         .replace("{socks_addr}", &plan.proxy_upstream.to_string())
@@ -349,6 +364,7 @@ mod tests {
             exclude_cidrs: vec![],
             bypass_uids: vec![],
             bypass_gids: vec![],
+            bypass_processes: vec!["foo.exe".to_string(), "bar.exe".to_string()],
             dns_capture: false,
             dns_listen_ip: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
             dns_listen_port: 15353,
@@ -362,10 +378,11 @@ mod tests {
     fn render_cmd_replaces_placeholders() {
         let p = sample_plan();
         let out = render_transparent_cmd(
-            "worker --listen {listen_port} --socks {socks_host}:{socks_port} --all {socks_addr}",
+            "worker --listen {listen_port} --proxy {proxy_addr} --bypass {bypass_processes_csv}",
             &p,
         );
         assert!(out.contains("18080"));
         assert!(out.contains("127.0.0.1:1080"));
+        assert!(out.contains("foo.exe,bar.exe"));
     }
 }

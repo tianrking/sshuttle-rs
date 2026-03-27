@@ -54,6 +54,9 @@ pub struct RunArgs {
     #[arg(long = "bypass-gid")]
     pub bypass_gids: Vec<u32>,
 
+    #[arg(long = "bypass-process")]
+    pub bypass_processes: Vec<String>,
+
     #[arg(long)]
     pub dry_run: bool,
 
@@ -147,6 +150,7 @@ pub struct RuntimeConfig {
     pub exclude_cidrs: Vec<String>,
     pub bypass_uids: Vec<u32>,
     pub bypass_gids: Vec<u32>,
+    pub bypass_processes: Vec<String>,
     pub dry_run: bool,
     pub no_apply_rules: bool,
     pub dns_capture: bool,
@@ -172,6 +176,7 @@ impl From<RunArgs> for RuntimeConfig {
             exclude_cidrs: value.exclude_cidrs,
             bypass_uids: value.bypass_uids,
             bypass_gids: value.bypass_gids,
+            bypass_processes: value.bypass_processes,
             dry_run: value.dry_run,
             no_apply_rules: value.no_apply_rules,
             dns_capture: value.dns_capture,
@@ -222,6 +227,7 @@ pub struct RulePlan {
     pub exclude_cidrs: Vec<String>,
     pub bypass_uids: Vec<u32>,
     pub bypass_gids: Vec<u32>,
+    pub bypass_processes: Vec<String>,
     pub dns_capture: bool,
     pub dns_listen_ip: IpAddr,
     pub dns_listen_port: u16,
@@ -249,6 +255,7 @@ impl RuntimeConfig {
             exclude_cidrs: excludes,
             bypass_uids: self.bypass_uids.clone(),
             bypass_gids: self.bypass_gids.clone(),
+            bypass_processes: self.bypass_processes.clone(),
             dns_capture: self.dns_capture,
             dns_listen_ip: self.dns_listen.ip(),
             dns_listen_port: self.dns_listen.port(),
@@ -293,6 +300,7 @@ mod tests {
             exclude_cidrs: vec![],
             bypass_uids: vec![],
             bypass_gids: vec![],
+            bypass_processes: vec![],
             dry_run: true,
             no_apply_rules: true,
             dns_capture: false,
