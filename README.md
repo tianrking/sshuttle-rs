@@ -17,6 +17,18 @@ cargo run -- run --mode transparent --socks5 127.0.0.1:1080 --listen 127.0.0.1:1
 sudo cargo run -- run --mode transparent --socks5 127.0.0.1:1080 --listen 127.0.0.1:18080
 ```
 
+## Linux transparent mode with DNS capture
+
+```bash
+sudo cargo run -- run \
+  --mode transparent \
+  --socks5 127.0.0.1:1080 \
+  --listen 127.0.0.1:18080 \
+  --dns-capture \
+  --dns-listen 127.0.0.1:15353 \
+  --dns-upstream 1.1.1.1:53
+```
+
 ## Windows system-proxy mode (MVP)
 
 ```powershell
@@ -30,6 +42,7 @@ The app now snapshots previous `ProxyEnable/ProxyServer` and restores them on ex
 
 - Linux backend: implemented (iptables OUTPUT redirect chain).
 - Transparent TCP relay to SOCKS5: implemented.
+- DNS capture (Linux): implemented (`udp/53` redirect + local DNS forwarder).
 - Windows backend:
   - system-proxy mode: implemented (registry-based WinINET proxy toggle).
   - transparent mode: planned (WinDivert/WFP).

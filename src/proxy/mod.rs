@@ -1,3 +1,4 @@
+mod dns;
 mod original_dst;
 mod socks5;
 
@@ -7,6 +8,21 @@ use tokio::net::{TcpListener, TcpStream};
 pub struct TransparentProxy {
     listen: std::net::SocketAddr,
     socks5: std::net::SocketAddr,
+}
+
+pub struct DnsProxy {
+    listen: std::net::SocketAddr,
+    upstream: std::net::SocketAddr,
+}
+
+impl DnsProxy {
+    pub fn new(listen: std::net::SocketAddr, upstream: std::net::SocketAddr) -> Self {
+        Self { listen, upstream }
+    }
+
+    pub async fn run(self) -> Result<()> {
+        dns::run_dns_proxy(self.listen, self.upstream).await
+    }
 }
 
 impl TransparentProxy {

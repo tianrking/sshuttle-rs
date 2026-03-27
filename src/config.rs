@@ -37,6 +37,15 @@ pub struct RunArgs {
     #[arg(long)]
     pub no_apply_rules: bool,
 
+    #[arg(long)]
+    pub dns_capture: bool,
+
+    #[arg(long, default_value = "127.0.0.1:15353")]
+    pub dns_listen: SocketAddr,
+
+    #[arg(long, default_value = "1.1.1.1:53")]
+    pub dns_upstream: SocketAddr,
+
     #[arg(long, value_enum, default_value_t = PlatformArg::Auto)]
     pub platform: PlatformArg,
 }
@@ -63,6 +72,9 @@ pub struct RuntimeConfig {
     pub exclude_cidrs: Vec<String>,
     pub dry_run: bool,
     pub no_apply_rules: bool,
+    pub dns_capture: bool,
+    pub dns_listen: SocketAddr,
+    pub dns_upstream: SocketAddr,
     pub requested_platform: PlatformArg,
 }
 
@@ -76,6 +88,9 @@ impl From<RunArgs> for RuntimeConfig {
             exclude_cidrs: value.exclude_cidrs,
             dry_run: value.dry_run,
             no_apply_rules: value.no_apply_rules,
+            dns_capture: value.dns_capture,
+            dns_listen: value.dns_listen,
+            dns_upstream: value.dns_upstream,
             requested_platform: value.platform,
         }
     }
@@ -88,13 +103,18 @@ pub struct RulePlan {
     pub socks_upstream: SocketAddr,
     pub include_cidrs: Vec<String>,
     pub exclude_cidrs: Vec<String>,
+    pub dns_capture: bool,
+    pub dns_listen_port: u16,
 }
 
 impl RuntimeConfig {
     pub fn to_rule_plan(&self) -> RulePlan {
         let mut excludes = self.exclude_cidrs.clone();
         excludes.push(loopback_exclusion(self.listen.ip()));
-        excludes.push(format!("{}/32", self.socks5.ip()));
+        excludes.push(single_host_cidr(self.socks5.ip()));
+        if self.dns_capture {
+            excludes.push(single_host_cidr(self.dns_upstream.ip()));
+        }
 
         RulePlan {
             mode: self.mode,
@@ -102,6 +122,8 @@ impl RuntimeConfig {
             socks_upstream: self.socks5,
             include_cidrs: self.include_cidrs.clone(),
             exclude_cidrs: excludes,
+            dns_capture: self.dns_capture,
+            dns_listen_port: self.dns_listen.port(),
         }
     }
 }
@@ -110,5 +132,12 @@ fn loopback_exclusion(ip: IpAddr) -> String {
     match ip {
         IpAddr::V4(_) => "127.0.0.0/8".to_string(),
         IpAddr::V6(_) => "::1/128".to_string(),
+    }
+}
+
+fn single_host_cidr(ip: IpAddr) -> String {
+    match ip {
+        IpAddr::V4(v4) => format!("{v4}/32"),
+        IpAddr::V6(v6) => format!("{v6}/128"),
     }
 }

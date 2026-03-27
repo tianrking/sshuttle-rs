@@ -77,6 +77,29 @@ impl Platform for LinuxPlatform {
                 ],
             )
             .await?;
+
+            if plan.dns_capture {
+                exec.run(
+                    "iptables",
+                    [
+                        "-t",
+                        "nat",
+                        "-A",
+                        &chain,
+                        "-p",
+                        "udp",
+                        "--dport",
+                        "53",
+                        "-d",
+                        cidr,
+                        "-j",
+                        "REDIRECT",
+                        "--to-ports",
+                        &plan.dns_listen_port.to_string(),
+                    ],
+                )
+                .await?;
+            }
         }
 
         exec.run(
@@ -92,6 +115,15 @@ impl Platform for LinuxPlatform {
         )
         .await
         .ok();
+
+        if plan.dns_capture {
+            exec.run(
+                "iptables",
+                ["-t", "nat", "-A", "OUTPUT", "-p", "udp", "--dport", "53", "-j", &chain],
+            )
+            .await
+            .ok();
+        }
 
         Ok(())
     }
@@ -109,6 +141,15 @@ impl Platform for LinuxPlatform {
         )
         .await
         .ok();
+
+        if plan.dns_capture {
+            exec.run(
+                "iptables",
+                ["-t", "nat", "-D", "OUTPUT", "-p", "udp", "--dport", "53", "-j", &chain],
+            )
+            .await
+            .ok();
+        }
 
         exec.run("iptables", ["-t", "nat", "-F", &chain]).await.ok();
         exec.run("iptables", ["-t", "nat", "-X", &chain]).await.ok();
