@@ -25,9 +25,10 @@ Put these files beside `sshuttle-rs.exe` (or use `WINDIVERT_PATH` during build/r
 - UDP selected ports when `--udp-capture --udp-port ...`: redirected to `--udp-listen`.
 - Policy and bypass-process list are evaluated before redirect.
 - Policy reload is supported when policy file mtime changes.
+- IPv4 and IPv6 packet metadata parsing and destination rewrite are both supported for the practical redirect path.
 
 ## Notes
 
-- Native dataplane currently focuses on IPv4 network layer interception.
+- Native dataplane currently focuses on practical transport path (TCP + DNS UDP + selected UDP ports) and avoids complex/rare protocol corner cases by design.
 - External `sshuttle-rs-windivert.exe` remains a fallback path.
 - Linux remains first-class and uses iptables/nft redirection with the same policy validation semantics.

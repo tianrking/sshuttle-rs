@@ -25,9 +25,10 @@
 - 开启 `--udp-capture --udp-port ...` 时，对指定 UDP 端口重定向到 `--udp-listen`。
 - 重定向前会执行 policy 与 `--bypass-process` 判断。
 - policy 文件修改后支持热重载。
+- 实用重定向路径已支持 IPv4/IPv6 的报文解析与目的地址改写。
 
 ## 说明
 
-- 当前原生数据面重点覆盖 IPv4 network layer。
+- 当前原生数据面重点覆盖实用传输路径（TCP + DNS UDP + 指定 UDP 端口），有意避免过度复杂的少见协议边角场景。
 - 外部 `sshuttle-rs-windivert.exe` 仍可作为回退路径。
 - Linux 仍是一等支持，走 iptables/nft 重定向，policy 校验语义保持一致。

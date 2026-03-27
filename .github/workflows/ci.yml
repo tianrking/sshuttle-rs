@@ -27,6 +27,10 @@ jobs:
         run: cargo test --all-targets -- --nocapture
       - name: Cargo clippy
         run: cargo clippy --all-targets -- -D warnings
+      - name: Smoke explain
+        run: cargo run -- explain --policy-file .\examples\policy.sample.yaml --process-name sslocal.exe --dst 8.8.8.8:443 --proto tcp
+      - name: Smoke doctor
+        run: cargo run -- doctor --mode transparent --platform auto --policy-file .\examples\policy.sample.yaml --bypass-check-process sslocal.exe --bypass-check-dst 8.8.8.8:443 --bypass-check-proto tcp
 
   cross-build:
     runs-on: ubuntu-latest
