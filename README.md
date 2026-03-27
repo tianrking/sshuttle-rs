@@ -37,7 +37,8 @@ sudo cargo run -- run \
   --listen 127.0.0.1:18080 \
   --dns-capture \
   --dns-listen 127.0.0.1:15353 \
-  --dns-upstream 1.1.1.1:53
+  --dns-upstream 1.1.1.1:53 \
+  --dns-via-socks true
 ```
 
 ## Windows system-proxy mode (MVP)

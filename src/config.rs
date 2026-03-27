@@ -58,6 +58,9 @@ pub struct RunArgs {
     #[arg(long, default_value = "1.1.1.1:53")]
     pub dns_upstream: SocketAddr,
 
+    #[arg(long, default_value_t = true)]
+    pub dns_via_socks: bool,
+
     #[arg(long, value_enum, default_value_t = PlatformArg::Auto)]
     pub platform: PlatformArg,
 }
@@ -91,6 +94,7 @@ pub struct RuntimeConfig {
     pub dns_capture: bool,
     pub dns_listen: SocketAddr,
     pub dns_upstream: SocketAddr,
+    pub dns_via_socks: bool,
     pub requested_platform: PlatformArg,
 }
 
@@ -111,6 +115,7 @@ impl From<RunArgs> for RuntimeConfig {
             dns_capture: value.dns_capture,
             dns_listen: value.dns_listen,
             dns_upstream: value.dns_upstream,
+            dns_via_socks: value.dns_via_socks,
             requested_platform: value.platform,
         }
     }

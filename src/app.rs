@@ -33,12 +33,18 @@ async fn run_mode(cfg: RuntimeConfig) -> Result<()> {
 
     match cfg.mode {
         ModeArg::Transparent => {
-            let proxy = TransparentProxy::new(cfg.listen, cfg.socks5);
             println!("[info] run mode: transparent");
-            run_tasks.push(tokio::spawn(async move { proxy.run().await }));
+            if platform.name().starts_with("linux/") {
+                let proxy = TransparentProxy::new(cfg.listen, cfg.socks5);
+                run_tasks.push(tokio::spawn(async move { proxy.run().await }));
+            } else {
+                println!(
+                    "[info] transparent runtime is delegated to platform backend worker/native engine"
+                );
+            }
 
             if cfg.dns_capture {
-                let dns = DnsProxy::new(cfg.dns_listen, cfg.dns_upstream);
+                let dns = DnsProxy::new(cfg.dns_listen, cfg.dns_upstream, cfg.socks5, cfg.dns_via_socks);
                 run_tasks.push(tokio::spawn(async move { dns.run().await }));
             }
         }

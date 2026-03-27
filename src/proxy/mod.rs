@@ -13,15 +13,27 @@ pub struct TransparentProxy {
 pub struct DnsProxy {
     listen: std::net::SocketAddr,
     upstream: std::net::SocketAddr,
+    socks5: std::net::SocketAddr,
+    via_socks: bool,
 }
 
 impl DnsProxy {
-    pub fn new(listen: std::net::SocketAddr, upstream: std::net::SocketAddr) -> Self {
-        Self { listen, upstream }
+    pub fn new(
+        listen: std::net::SocketAddr,
+        upstream: std::net::SocketAddr,
+        socks5: std::net::SocketAddr,
+        via_socks: bool,
+    ) -> Self {
+        Self {
+            listen,
+            upstream,
+            socks5,
+            via_socks,
+        }
     }
 
     pub async fn run(self) -> Result<()> {
-        dns::run_dns_proxy(self.listen, self.upstream).await
+        dns::run_dns_proxy(self.listen, self.upstream, self.socks5, self.via_socks).await
     }
 }
 
