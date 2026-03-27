@@ -14,6 +14,7 @@
   - `transparent`（内置 native worker，可自动接管外部 WinDivert 引擎）
 - DNS 捕获：可选（`--dns-capture`），支持 SOCKS5 UDP 路径
 - 运维命令：`doctor`、`cleanup`
+- 策略引擎：JSON/YAML（`--policy-file`）+ `explain` + `doctor --bypass-check-process`
 
 ## 快速开始
 
@@ -59,6 +60,21 @@ cargo run -- run `
   --bypass-process "program-b.exe"
 ```
 
+推荐使用策略文件（更精细匹配）：
+
+```powershell
+cargo run -- run `
+  --mode transparent `
+  --platform windows `
+  --proxy 127.0.0.1:1080 `
+  --proxy-type socks5 `
+  --policy-file .\\examples\\policy.sample.yaml
+```
+
+JSON 和 YAML 都支持，示例：
+- `examples/policy.sample.yaml`
+- `examples/policy.sample.json`
+
 ## 常用命令
 
 Dry-run：
@@ -71,6 +87,27 @@ Doctor：
 
 ```bash
 cargo run -- doctor --mode transparent --platform auto --linux-backend auto --dns-capture
+```
+
+带绕过校验的 Doctor：
+
+```powershell
+cargo run -- doctor `
+  --platform windows `
+  --policy-file .\\examples\\policy.sample.yaml `
+  --bypass-check-process "sslocal.exe" `
+  --bypass-check-dst 8.8.8.8:443 `
+  --bypass-check-proto tcp
+```
+
+单流量命中解释：
+
+```powershell
+cargo run -- explain `
+  --policy-file .\\examples\\policy.sample.yaml `
+  --process-name "sslocal.exe" `
+  --dst 8.8.8.8:443 `
+  --proto tcp
 ```
 
 Cleanup：

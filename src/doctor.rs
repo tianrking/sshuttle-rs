@@ -2,6 +2,7 @@ use anyhow::Result;
 use tokio::process::Command;
 
 use crate::config::{DoctorConfig, LinuxBackendArg, ModeArg, PlatformArg, ProxyTypeArg};
+use crate::policy::{FlowContext, PolicyAction, PolicyFile};
 
 pub async fn run(cfg: DoctorConfig) -> Result<()> {
     let platform = resolved_platform(cfg.requested_platform);
@@ -20,7 +21,8 @@ pub async fn run(cfg: DoctorConfig) -> Result<()> {
             println!("[doctor] linux backend: {:?}", backend);
             match backend {
                 LinuxBackendArg::Nft => {
-                    missing += check_cmd("nft", &["--version"], "nftables userspace").await as usize;
+                    missing +=
+                        check_cmd("nft", &["--version"], "nftables userspace").await as usize;
                 }
                 LinuxBackendArg::Iptables | LinuxBackendArg::Auto => {
                     missing += check_cmd("iptables", &["--version"], "iptables").await as usize;
@@ -30,9 +32,16 @@ pub async fn run(cfg: DoctorConfig) -> Result<()> {
         }
         "windows" => {
             missing += check_cmd("reg", &["/?"], "registry tool").await as usize;
-            missing += check_cmd("powershell", &["-NoProfile", "-Command", "$PSVersionTable.PSVersion"], "powershell").await as usize;
+            missing += check_cmd(
+                "powershell",
+                &["-NoProfile", "-Command", "$PSVersionTable.PSVersion"],
+                "powershell",
+            )
+            .await as usize;
             if matches!(cfg.mode, ModeArg::Transparent) {
-                println!("[doctor] transparent mode on windows uses built-in native worker (external worker override optional)");
+                println!(
+                    "[doctor] transparent mode on windows uses built-in native worker (external worker override optional)"
+                );
                 missing += check_cmd("taskkill", &["/?"], "taskkill").await as usize;
             }
         }
@@ -50,6 +59,52 @@ pub async fn run(cfg: DoctorConfig) -> Result<()> {
                 "[doctor][warn] --dns-via-socks requires --proxy-type socks5, current={:?}",
                 cfg.proxy_type
             );
+        }
+    }
+
+    if let Some(path) = &cfg.policy_file {
+        let policy = PolicyFile::load(path)?;
+        println!(
+            "[doctor] policy: {} (rules={})",
+            path.display(),
+            policy.rules.len()
+        );
+        if cfg.bypass_check_processes.is_empty() {
+            let inferred = policy.static_bypass_processes();
+            if inferred.is_empty() {
+                println!("[doctor] bypass-check: no static bypass process inferred from policy");
+            } else {
+                println!(
+                    "[doctor] bypass-check: inferred static process entries = {}",
+                    inferred.join(", ")
+                );
+            }
+        } else {
+            for p in &cfg.bypass_check_processes {
+                let flow = FlowContext {
+                    process_name: Some(p.clone()),
+                    process_path: Some(p.clone()),
+                    dst: cfg.bypass_check_dst,
+                    proto: cfg.bypass_check_proto,
+                };
+                let decision = policy.explain(&flow);
+                if decision.action == PolicyAction::Bypass {
+                    println!(
+                        "[doctor][ok] bypass-check process={} dst={} -> BYPASS ({})",
+                        p,
+                        cfg.bypass_check_dst,
+                        decision.matched_rule.as_deref().unwrap_or("default"),
+                    );
+                } else {
+                    println!(
+                        "[doctor][warn] bypass-check process={} dst={} -> {:?} ({})",
+                        p,
+                        cfg.bypass_check_dst,
+                        decision.action,
+                        decision.matched_rule.as_deref().unwrap_or("default"),
+                    );
+                }
+            }
         }
     }
 

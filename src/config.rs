@@ -1,9 +1,16 @@
 use std::net::{IpAddr, SocketAddr};
+use std::path::PathBuf;
 
 use clap::{Parser, ValueEnum};
 
+use crate::policy::FlowProto;
+
 #[derive(Debug, Parser)]
-#[command(author, version, about = "Cross-platform transparent proxy core (Rust rewrite draft)")]
+#[command(
+    author,
+    version,
+    about = "Cross-platform transparent proxy core (Rust rewrite draft)"
+)]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Command,
@@ -14,6 +21,7 @@ pub enum Command {
     Run(RunArgs),
     Doctor(DoctorArgs),
     Cleanup(RunArgs),
+    Explain(ExplainArgs),
     #[command(hide = true)]
     WinNativeWorker(WinNativeWorkerArgs),
 }
@@ -58,6 +66,9 @@ pub struct RunArgs {
 
     #[arg(long = "bypass-process")]
     pub bypass_processes: Vec<String>,
+
+    #[arg(long)]
+    pub policy_file: Option<PathBuf>,
 
     #[arg(long)]
     pub dry_run: bool,
@@ -118,6 +129,36 @@ pub struct DoctorArgs {
 
     #[arg(long, value_enum, default_value_t = ProxyTypeArg::Socks5)]
     pub proxy_type: ProxyTypeArg,
+
+    #[arg(long)]
+    pub policy_file: Option<PathBuf>,
+
+    #[arg(long = "bypass-check-process")]
+    pub bypass_check_processes: Vec<String>,
+
+    #[arg(long = "bypass-check-dst", default_value = "1.1.1.1:443")]
+    pub bypass_check_dst: SocketAddr,
+
+    #[arg(long = "bypass-check-proto", value_enum, default_value_t = FlowProtoArg::Tcp)]
+    pub bypass_check_proto: FlowProtoArg,
+}
+
+#[derive(Debug, clap::Args)]
+pub struct ExplainArgs {
+    #[arg(long)]
+    pub policy_file: PathBuf,
+
+    #[arg(long)]
+    pub process_name: Option<String>,
+
+    #[arg(long)]
+    pub process_path: Option<String>,
+
+    #[arg(long)]
+    pub dst: SocketAddr,
+
+    #[arg(long, value_enum, default_value_t = FlowProtoArg::Tcp)]
+    pub proto: FlowProtoArg,
 }
 
 #[derive(Debug, clap::Args)]
@@ -128,6 +169,8 @@ pub struct WinNativeWorkerArgs {
     pub proxy_addr: SocketAddr,
     #[arg(long = "bypass-process")]
     pub bypass_processes: Vec<String>,
+    #[arg(long)]
+    pub policy_file: Option<PathBuf>,
 }
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
@@ -157,6 +200,21 @@ pub enum ProxyTypeArg {
     Http,
 }
 
+#[derive(Clone, Copy, Debug, ValueEnum)]
+pub enum FlowProtoArg {
+    Tcp,
+    Udp,
+}
+
+impl From<FlowProtoArg> for FlowProto {
+    fn from(value: FlowProtoArg) -> Self {
+        match value {
+            FlowProtoArg::Tcp => FlowProto::Tcp,
+            FlowProtoArg::Udp => FlowProto::Udp,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct RuntimeConfig {
     pub mode: ModeArg,
@@ -172,6 +230,7 @@ pub struct RuntimeConfig {
     pub bypass_uids: Vec<u32>,
     pub bypass_gids: Vec<u32>,
     pub bypass_processes: Vec<String>,
+    pub policy_file: Option<PathBuf>,
     pub dry_run: bool,
     pub no_apply_rules: bool,
     pub dns_capture: bool,
@@ -201,6 +260,7 @@ impl From<RunArgs> for RuntimeConfig {
             bypass_uids: value.bypass_uids,
             bypass_gids: value.bypass_gids,
             bypass_processes: value.bypass_processes,
+            policy_file: value.policy_file,
             dry_run: value.dry_run,
             no_apply_rules: value.no_apply_rules,
             dns_capture: value.dns_capture,
@@ -226,6 +286,10 @@ pub struct DoctorConfig {
     pub dns_capture: bool,
     pub dns_via_socks: bool,
     pub proxy_type: ProxyTypeArg,
+    pub policy_file: Option<PathBuf>,
+    pub bypass_check_processes: Vec<String>,
+    pub bypass_check_dst: SocketAddr,
+    pub bypass_check_proto: FlowProto,
 }
 
 impl From<DoctorArgs> for DoctorConfig {
@@ -239,6 +303,31 @@ impl From<DoctorArgs> for DoctorConfig {
             dns_capture: value.dns_capture,
             dns_via_socks: value.dns_via_socks,
             proxy_type: value.proxy_type,
+            policy_file: value.policy_file,
+            bypass_check_processes: value.bypass_check_processes,
+            bypass_check_dst: value.bypass_check_dst,
+            bypass_check_proto: value.bypass_check_proto.into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ExplainConfig {
+    pub policy_file: PathBuf,
+    pub process_name: Option<String>,
+    pub process_path: Option<String>,
+    pub dst: SocketAddr,
+    pub proto: FlowProto,
+}
+
+impl From<ExplainArgs> for ExplainConfig {
+    fn from(value: ExplainArgs) -> Self {
+        Self {
+            policy_file: value.policy_file,
+            process_name: value.process_name,
+            process_path: value.process_path,
+            dst: value.dst,
+            proto: value.proto.into(),
         }
     }
 }
@@ -255,6 +344,7 @@ pub struct RulePlan {
     pub bypass_uids: Vec<u32>,
     pub bypass_gids: Vec<u32>,
     pub bypass_processes: Vec<String>,
+    pub policy_file: Option<PathBuf>,
     pub dns_capture: bool,
     pub dns_listen_ip: IpAddr,
     pub dns_listen_port: u16,
@@ -287,6 +377,7 @@ impl RuntimeConfig {
             bypass_uids: self.bypass_uids.clone(),
             bypass_gids: self.bypass_gids.clone(),
             bypass_processes: self.bypass_processes.clone(),
+            policy_file: self.policy_file.clone(),
             dns_capture: self.dns_capture,
             dns_listen_ip: self.dns_listen.ip(),
             dns_listen_port: self.dns_listen.port(),
@@ -336,6 +427,7 @@ mod tests {
             bypass_uids: vec![],
             bypass_gids: vec![],
             bypass_processes: vec![],
+            policy_file: None,
             dry_run: true,
             no_apply_rules: true,
             dns_capture: false,

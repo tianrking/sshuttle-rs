@@ -2,6 +2,7 @@ mod app;
 mod config;
 mod doctor;
 mod platform;
+mod policy;
 mod proxy;
 mod win_native;
 

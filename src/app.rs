@@ -3,9 +3,10 @@ use std::process::Stdio;
 use tokio::task::JoinHandle;
 use tokio::{process::Child, process::Command as TokioCommand, time::Duration};
 
-use crate::config::{Cli, Command, ModeArg, ProxyTypeArg, RuntimeConfig};
+use crate::config::{Cli, Command, ExplainConfig, ModeArg, ProxyTypeArg, RuntimeConfig};
 use crate::doctor;
-use crate::platform::{build_platform, CommandExecutor};
+use crate::platform::{CommandExecutor, build_platform};
+use crate::policy::{FlowContext, PolicyFile};
 use crate::proxy::{DnsProxy, TransparentProxy, UdpTransparentProxy};
 use crate::win_native;
 
@@ -14,19 +15,47 @@ pub async fn run(cli: Cli) -> Result<()> {
         Command::Run(args) => run_mode(args.into()).await,
         Command::Doctor(args) => doctor::run(args.into()).await,
         Command::Cleanup(args) => cleanup_mode(args.into()).await,
+        Command::Explain(args) => explain_mode(args.into()).await,
         Command::WinNativeWorker(args) => win_native::run(args).await,
     }
 }
 
-async fn run_mode(cfg: RuntimeConfig) -> Result<()> {
+async fn run_mode(mut cfg: RuntimeConfig) -> Result<()> {
+    if let Some(path) = cfg.policy_file.clone() {
+        let policy = PolicyFile::load(path.as_path())?;
+        let inferred_bypass = policy.static_bypass_processes();
+        if !inferred_bypass.is_empty() {
+            let mut added = 0usize;
+            for p in inferred_bypass {
+                if !cfg
+                    .bypass_processes
+                    .iter()
+                    .any(|x| x.eq_ignore_ascii_case(&p))
+                {
+                    cfg.bypass_processes.push(p);
+                    added += 1;
+                }
+            }
+            if added > 0 {
+                println!("[info] policy preloaded: added {added} static bypass process entries");
+            }
+        }
+    }
+
     let platform = build_platform(cfg.requested_platform)?;
     let exec = CommandExecutor::new(cfg.dry_run);
     let rules = cfg.to_rule_plan();
 
     println!("[info] selected platform backend: {}", platform.name());
-    println!("[info] upstream proxy: {} ({:?})", cfg.proxy, cfg.proxy_type);
+    println!(
+        "[info] upstream proxy: {} ({:?})",
+        cfg.proxy, cfg.proxy_type
+    );
     println!("[info] transparent listen: {}", cfg.listen);
-    println!("[info] dns capture: {}", if cfg.dns_capture { "on" } else { "off" });
+    println!(
+        "[info] dns capture: {}",
+        if cfg.dns_capture { "on" } else { "off" }
+    );
 
     let mut ssh_tunnel = start_ssh_dynamic_tunnel(&cfg).await?;
 
@@ -133,6 +162,26 @@ async fn cleanup_mode(cfg: RuntimeConfig) -> Result<()> {
     let platform = build_platform(cfg.requested_platform)?;
     let exec = CommandExecutor::new(cfg.dry_run);
     let rules = cfg.to_rule_plan();
-    println!("[info] running cleanup for platform backend: {}", platform.name());
+    println!(
+        "[info] running cleanup for platform backend: {}",
+        platform.name()
+    );
     platform.cleanup_rules(&rules, &exec).await
+}
+
+async fn explain_mode(cfg: ExplainConfig) -> Result<()> {
+    let policy = PolicyFile::load(cfg.policy_file.as_path())?;
+    let flow = FlowContext {
+        process_name: cfg.process_name,
+        process_path: cfg.process_path,
+        dst: cfg.dst,
+        proto: cfg.proto,
+    };
+    let decision = policy.explain(&flow);
+    println!("[explain] action={:?}", decision.action);
+    match decision.matched_rule {
+        Some(rule) => println!("[explain] matched_rule={rule}"),
+        None => println!("[explain] matched_rule=<default>"),
+    }
+    Ok(())
 }

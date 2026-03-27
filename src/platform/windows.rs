@@ -2,8 +2,8 @@ use anyhow::Result;
 use async_trait::async_trait;
 use std::path::PathBuf;
 
-use crate::config::{ModeArg, ProxyTypeArg};
 use crate::config::RulePlan;
+use crate::config::{ModeArg, ProxyTypeArg};
 
 use super::{CommandExecutor, Platform};
 
@@ -32,10 +32,18 @@ impl Platform for WindowsPlatform {
                 }
                 let proxy = match plan.proxy_type {
                     ProxyTypeArg::Socks5 | ProxyTypeArg::Socks4 => {
-                        format!("socks={}:{}", plan.proxy_upstream.ip(), plan.proxy_upstream.port())
+                        format!(
+                            "socks={}:{}",
+                            plan.proxy_upstream.ip(),
+                            plan.proxy_upstream.port()
+                        )
                     }
                     ProxyTypeArg::Http => {
-                        format!("http={}:{}", plan.proxy_upstream.ip(), plan.proxy_upstream.port())
+                        format!(
+                            "http={}:{}",
+                            plan.proxy_upstream.ip(),
+                            plan.proxy_upstream.port()
+                        )
                     }
                 };
                 let key = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings";
@@ -161,7 +169,10 @@ async fn cleanup_transparent_worker(plan: &RulePlan, exec: &CommandExecutor) -> 
     if let Some(stop_tpl) = &plan.win_transparent_stop_cmd {
         let rendered = render_transparent_cmd(stop_tpl, plan);
         exec.run("cmd.exe", ["/C", &rendered]).await.ok();
-        println!("[info] windows transparent worker stop command executed: {}", rendered);
+        println!(
+            "[info] windows transparent worker stop command executed: {}",
+            rendered
+        );
         return Ok(());
     }
 
@@ -300,7 +311,10 @@ async fn restore_previous_proxy_state(exec: &CommandExecutor, key: &str) -> Resu
         [
             "-NoProfile",
             "-Command",
-            &format!("Remove-Item -Force '{}' -ErrorAction SilentlyContinue", state_file_path().display()),
+            &format!(
+                "Remove-Item -Force '{}' -ErrorAction SilentlyContinue",
+                state_file_path().display()
+            ),
         ],
     )
     .await
@@ -330,10 +344,16 @@ fn worker_pid_file_path() -> PathBuf {
 fn render_transparent_cmd(tpl: &str, plan: &RulePlan) -> String {
     let bypass_csv = plan.bypass_processes.join(",");
     let bypass_semicolon = plan.bypass_processes.join(";");
+    let policy_file = plan
+        .policy_file
+        .as_ref()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_default();
     tpl.replace("{listen_port}", &plan.listen_port.to_string())
         .replace("{proxy_host}", &plan.proxy_upstream.ip().to_string())
         .replace("{proxy_port}", &plan.proxy_upstream.port().to_string())
         .replace("{proxy_addr}", &plan.proxy_upstream.to_string())
+        .replace("{policy_file}", &policy_file)
         .replace("{bypass_processes_csv}", &bypass_csv)
         .replace("{bypass_processes_semicolon}", &bypass_semicolon)
         .replace("{socks_host}", &plan.proxy_upstream.ip().to_string())
@@ -358,6 +378,10 @@ fn built_in_worker_cmd(plan: &RulePlan) -> Result<String> {
     for p in &plan.bypass_processes {
         parts.push("--bypass-process".to_string());
         parts.push(quote_cmd_arg(p));
+    }
+    if let Some(path) = &plan.policy_file {
+        parts.push("--policy-file".to_string());
+        parts.push(quote_cmd_arg(path.to_string_lossy().as_ref()));
     }
     Ok(parts.join(" "))
 }
@@ -393,6 +417,7 @@ mod tests {
             dns_listen_port: 15353,
             win_transparent_cmd: None,
             win_transparent_stop_cmd: None,
+            policy_file: None,
             linux_backend: LinuxBackendArg::Auto,
             udp_capture: false,
             udp_listen_ip: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),

@@ -14,6 +14,7 @@ A Rust-based transparent proxy orchestrator that can convert an upstream proxy i
   - `transparent` (built-in native worker with external WinDivert engine handoff)
 - DNS capture: optional (`--dns-capture`), SOCKS5 UDP path supported
 - Operations helpers: `doctor`, `cleanup`
+- Policy engine: JSON/YAML (`--policy-file`) + `explain` + `doctor --bypass-check-process`
 
 ## Quick Start
 
@@ -59,6 +60,21 @@ cargo run -- run `
   --bypass-process "program-b.exe"
 ```
 
+Policy file (recommended for precise matching):
+
+```powershell
+cargo run -- run `
+  --mode transparent `
+  --platform windows `
+  --proxy 127.0.0.1:1080 `
+  --proxy-type socks5 `
+  --policy-file .\\examples\\policy.sample.yaml
+```
+
+You can use either `json` or `yaml`; see:
+- `examples/policy.sample.yaml`
+- `examples/policy.sample.json`
+
 ## Command Examples
 
 Dry-run:
@@ -71,6 +87,27 @@ Doctor:
 
 ```bash
 cargo run -- doctor --mode transparent --platform auto --linux-backend auto --dns-capture
+```
+
+Doctor bypass-check with policy:
+
+```powershell
+cargo run -- doctor `
+  --platform windows `
+  --policy-file .\\examples\\policy.sample.yaml `
+  --bypass-check-process "sslocal.exe" `
+  --bypass-check-dst 8.8.8.8:443 `
+  --bypass-check-proto tcp
+```
+
+Explain one flow:
+
+```powershell
+cargo run -- explain `
+  --policy-file .\\examples\\policy.sample.yaml `
+  --process-name "sslocal.exe" `
+  --dst 8.8.8.8:443 `
+  --proto tcp
 ```
 
 Cleanup:
