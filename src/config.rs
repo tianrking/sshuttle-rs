@@ -13,6 +13,7 @@ pub struct Cli {
 pub enum Command {
     Run(RunArgs),
     Doctor(DoctorArgs),
+    Cleanup(RunArgs),
 }
 
 #[derive(Debug, clap::Args)]

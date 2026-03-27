@@ -17,6 +17,12 @@ cargo run -- run --mode transparent --socks5 127.0.0.1:1080 --listen 127.0.0.1:1
 cargo run -- doctor --mode transparent --platform auto --linux-backend auto --dns-capture
 ```
 
+## Cleanup (manual recover)
+
+```bash
+cargo run -- cleanup --mode transparent --platform auto --listen 127.0.0.1:18080
+```
+
 ## Linux transparent mode (apply iptables rules)
 
 ```bash

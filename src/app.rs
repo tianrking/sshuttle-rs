@@ -12,6 +12,7 @@ pub async fn run(cli: Cli) -> Result<()> {
     match cli.command {
         Command::Run(args) => run_mode(args.into()).await,
         Command::Doctor(args) => doctor::run(args.into()).await,
+        Command::Cleanup(args) => cleanup_mode(args.into()).await,
     }
 }
 
@@ -102,4 +103,12 @@ async fn start_ssh_dynamic_tunnel(cfg: &RuntimeConfig) -> Result<Option<Child>> 
     }
 
     Ok(Some(child))
+}
+
+async fn cleanup_mode(cfg: RuntimeConfig) -> Result<()> {
+    let platform = build_platform(cfg.requested_platform)?;
+    let exec = CommandExecutor::new(cfg.dry_run);
+    let rules = cfg.to_rule_plan();
+    println!("[info] running cleanup for platform backend: {}", platform.name());
+    platform.cleanup_rules(&rules, &exec).await
 }
