@@ -1,4 +1,4 @@
-use anyhow::{Result, bail};
+use anyhow::Result;
 use async_trait::async_trait;
 use std::path::PathBuf;
 
@@ -18,16 +18,12 @@ impl WindowsPlatform {
 #[async_trait]
 impl Platform for WindowsPlatform {
     fn name(&self) -> &'static str {
-        "windows/system-proxy+transparent-planned"
+        "windows/system-proxy+transparent-worker"
     }
 
     async fn apply_rules(&self, plan: &RulePlan, exec: &CommandExecutor) -> Result<()> {
         match plan.mode {
-            ModeArg::Transparent => {
-                bail!(
-                    "Windows transparent redirect backend is not implemented yet (planned: WinDivert/WFP)"
-                )
-            }
+            ModeArg::Transparent => apply_transparent_worker(plan, exec).await,
             ModeArg::SystemProxy => {
                 let proxy = format!("socks={}:{}", plan.socks_upstream.ip(), plan.socks_upstream.port());
                 let key = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings";
@@ -77,7 +73,7 @@ impl Platform for WindowsPlatform {
 
     async fn cleanup_rules(&self, plan: &RulePlan, exec: &CommandExecutor) -> Result<()> {
         if matches!(plan.mode, ModeArg::Transparent) {
-            return Ok(());
+            return cleanup_transparent_worker(plan, exec).await;
         }
 
         let key = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings";
@@ -117,6 +113,70 @@ impl Platform for WindowsPlatform {
         println!("[info] windows system proxy restored");
         Ok(())
     }
+}
+
+async fn apply_transparent_worker(plan: &RulePlan, exec: &CommandExecutor) -> Result<()> {
+    let cmd_tpl = plan.win_transparent_cmd.as_ref().ok_or_else(|| {
+        anyhow::anyhow!(
+            "Windows transparent mode requires --win-transparent-cmd. \
+Example: --win-transparent-cmd \"my-windivert-worker.exe --listen {{listen_port}} --socks {{socks_host}}:{{socks_port}}\""
+        )
+    })?;
+    let rendered = render_transparent_cmd(cmd_tpl, plan);
+    let ps_script = format!(
+        "$p = Start-Process -FilePath 'cmd.exe' -ArgumentList '/C {}' -PassThru -WindowStyle Hidden; \
+Set-Content -Path '{}' -Value $p.Id; \
+Write-Output $p.Id",
+        escape_for_single_quote(&rendered),
+        worker_pid_file_path().display()
+    );
+    let pid = exec
+        .capture("powershell", ["-NoProfile", "-Command", &ps_script])
+        .await?;
+    println!(
+        "[info] windows transparent worker started (pid={}) with command: {}",
+        pid.trim(),
+        rendered
+    );
+    Ok(())
+}
+
+async fn cleanup_transparent_worker(plan: &RulePlan, exec: &CommandExecutor) -> Result<()> {
+    if let Some(stop_tpl) = &plan.win_transparent_stop_cmd {
+        let rendered = render_transparent_cmd(stop_tpl, plan);
+        exec.run("cmd.exe", ["/C", &rendered]).await.ok();
+        println!("[info] windows transparent worker stop command executed: {}", rendered);
+        return Ok(());
+    }
+
+    let pid_script = format!(
+        "if (Test-Path '{}') {{ Get-Content '{}' -Raw }}",
+        worker_pid_file_path().display(),
+        worker_pid_file_path().display()
+    );
+    let pid_raw = exec
+        .capture("powershell", ["-NoProfile", "-Command", &pid_script])
+        .await
+        .unwrap_or_default();
+    let pid = pid_raw.trim();
+    if !pid.is_empty() {
+        exec.run("taskkill", ["/PID", pid, "/T", "/F"]).await.ok();
+    }
+    exec.run(
+        "powershell",
+        [
+            "-NoProfile",
+            "-Command",
+            &format!(
+                "Remove-Item -Force '{}' -ErrorAction SilentlyContinue",
+                worker_pid_file_path().display()
+            ),
+        ],
+    )
+    .await
+    .ok();
+    println!("[info] windows transparent worker stopped");
+    Ok(())
 }
 
 async fn persist_previous_proxy_state(exec: &CommandExecutor, key: &str) -> Result<()> {
@@ -245,4 +305,19 @@ fn parse_reg_value(raw: &str, name: &str) -> Option<String> {
 
 fn state_file_path() -> PathBuf {
     std::env::temp_dir().join("sshuttle-rs-proxy-state.txt")
+}
+
+fn worker_pid_file_path() -> PathBuf {
+    std::env::temp_dir().join("sshuttle-rs-win-transparent.pid")
+}
+
+fn render_transparent_cmd(tpl: &str, plan: &RulePlan) -> String {
+    tpl.replace("{listen_port}", &plan.listen_port.to_string())
+        .replace("{socks_host}", &plan.socks_upstream.ip().to_string())
+        .replace("{socks_port}", &plan.socks_upstream.port().to_string())
+        .replace("{socks_addr}", &plan.socks_upstream.to_string())
+}
+
+fn escape_for_single_quote(s: &str) -> String {
+    s.replace('\'', "''")
 }

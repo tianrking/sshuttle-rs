@@ -31,6 +31,12 @@ pub struct RunArgs {
     #[arg(long, default_value = "ssh")]
     pub ssh_cmd: String,
 
+    #[arg(long)]
+    pub win_transparent_cmd: Option<String>,
+
+    #[arg(long)]
+    pub win_transparent_stop_cmd: Option<String>,
+
     #[arg(long = "include", default_value = "0.0.0.0/0")]
     pub include_cidrs: Vec<String>,
 
@@ -76,6 +82,8 @@ pub struct RuntimeConfig {
     pub socks5: SocketAddr,
     pub ssh_remote: Option<String>,
     pub ssh_cmd: String,
+    pub win_transparent_cmd: Option<String>,
+    pub win_transparent_stop_cmd: Option<String>,
     pub include_cidrs: Vec<String>,
     pub exclude_cidrs: Vec<String>,
     pub dry_run: bool,
@@ -94,6 +102,8 @@ impl From<RunArgs> for RuntimeConfig {
             socks5: value.socks5,
             ssh_remote: value.ssh_remote,
             ssh_cmd: value.ssh_cmd,
+            win_transparent_cmd: value.win_transparent_cmd,
+            win_transparent_stop_cmd: value.win_transparent_stop_cmd,
             include_cidrs: value.include_cidrs,
             exclude_cidrs: value.exclude_cidrs,
             dry_run: value.dry_run,
@@ -115,6 +125,8 @@ pub struct RulePlan {
     pub exclude_cidrs: Vec<String>,
     pub dns_capture: bool,
     pub dns_listen_port: u16,
+    pub win_transparent_cmd: Option<String>,
+    pub win_transparent_stop_cmd: Option<String>,
 }
 
 impl RuntimeConfig {
@@ -134,6 +146,8 @@ impl RuntimeConfig {
             exclude_cidrs: excludes,
             dns_capture: self.dns_capture,
             dns_listen_port: self.dns_listen.port(),
+            win_transparent_cmd: self.win_transparent_cmd.clone(),
+            win_transparent_stop_cmd: self.win_transparent_stop_cmd.clone(),
         }
     }
 }

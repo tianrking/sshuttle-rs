@@ -49,6 +49,22 @@ cargo run -- run --mode system-proxy --platform windows --socks5 127.0.0.1:1080
 Stop with Ctrl+C; cleanup will restore registry proxy settings.
 The app now snapshots previous `ProxyEnable/ProxyServer` and restores them on exit.
 
+## Windows transparent mode (worker command bridge)
+
+```powershell
+cargo run -- run `
+  --mode transparent `
+  --platform windows `
+  --socks5 127.0.0.1:1080 `
+  --win-transparent-cmd "my-windivert-worker.exe --listen {listen_port} --socks {socks_addr}"
+```
+
+Supported placeholders in command templates:
+- `{listen_port}`
+- `{socks_host}`
+- `{socks_port}`
+- `{socks_addr}`
+
 ## Status
 
 - Linux backend: implemented (iptables OUTPUT redirect chain).
@@ -57,6 +73,6 @@ The app now snapshots previous `ProxyEnable/ProxyServer` and restores them on ex
 - DNS capture (Linux): implemented (`udp/53` redirect + local DNS forwarder).
 - Windows backend:
   - system-proxy mode: implemented (registry-based WinINET proxy toggle).
-  - transparent mode: planned (WinDivert/WFP).
+  - transparent mode: worker-command bridge implemented; native WinDivert/WFP backend is next.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for architecture and roadmap.
