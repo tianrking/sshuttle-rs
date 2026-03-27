@@ -68,6 +68,7 @@ Supported placeholders in command templates:
 ## Status
 
 - Linux backend: implemented (iptables OUTPUT redirect chain).
+- Linux backend: dual-stack rule engine (`iptables` + `ip6tables`).
 - Transparent TCP relay to SOCKS5: implemented.
 - Optional SSH dynamic tunnel bootstrap (`ssh -N -D`): implemented.
 - DNS capture (Linux): implemented (`udp/53` redirect + local DNS forwarder).

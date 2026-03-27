@@ -119,11 +119,13 @@ impl From<RunArgs> for RuntimeConfig {
 #[derive(Debug, Clone)]
 pub struct RulePlan {
     pub mode: ModeArg,
+    pub listen_ip: IpAddr,
     pub listen_port: u16,
     pub socks_upstream: SocketAddr,
     pub include_cidrs: Vec<String>,
     pub exclude_cidrs: Vec<String>,
     pub dns_capture: bool,
+    pub dns_listen_ip: IpAddr,
     pub dns_listen_port: u16,
     pub win_transparent_cmd: Option<String>,
     pub win_transparent_stop_cmd: Option<String>,
@@ -140,11 +142,13 @@ impl RuntimeConfig {
 
         RulePlan {
             mode: self.mode,
+            listen_ip: self.listen.ip(),
             listen_port: self.listen.port(),
             socks_upstream: self.socks5,
             include_cidrs: self.include_cidrs.clone(),
             exclude_cidrs: excludes,
             dns_capture: self.dns_capture,
+            dns_listen_ip: self.dns_listen.ip(),
             dns_listen_port: self.dns_listen.port(),
             win_transparent_cmd: self.win_transparent_cmd.clone(),
             win_transparent_stop_cmd: self.win_transparent_stop_cmd.clone(),
