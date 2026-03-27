@@ -2,7 +2,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use std::path::PathBuf;
 
-use crate::config::ModeArg;
+use crate::config::{ModeArg, ProxyTypeArg};
 use crate::config::RulePlan;
 
 use super::{CommandExecutor, Platform};
@@ -25,7 +25,14 @@ impl Platform for WindowsPlatform {
         match plan.mode {
             ModeArg::Transparent => apply_transparent_worker(plan, exec).await,
             ModeArg::SystemProxy => {
-                let proxy = format!("socks={}:{}", plan.socks_upstream.ip(), plan.socks_upstream.port());
+                let proxy = match plan.proxy_type {
+                    ProxyTypeArg::Socks5 | ProxyTypeArg::Socks4 => {
+                        format!("socks={}:{}", plan.proxy_upstream.ip(), plan.proxy_upstream.port())
+                    }
+                    ProxyTypeArg::Http => {
+                        format!("http={}:{}", plan.proxy_upstream.ip(), plan.proxy_upstream.port())
+                    }
+                };
                 let key = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings";
                 persist_previous_proxy_state(exec, key).await?;
 
@@ -313,9 +320,12 @@ fn worker_pid_file_path() -> PathBuf {
 
 fn render_transparent_cmd(tpl: &str, plan: &RulePlan) -> String {
     tpl.replace("{listen_port}", &plan.listen_port.to_string())
-        .replace("{socks_host}", &plan.socks_upstream.ip().to_string())
-        .replace("{socks_port}", &plan.socks_upstream.port().to_string())
-        .replace("{socks_addr}", &plan.socks_upstream.to_string())
+        .replace("{proxy_host}", &plan.proxy_upstream.ip().to_string())
+        .replace("{proxy_port}", &plan.proxy_upstream.port().to_string())
+        .replace("{proxy_addr}", &plan.proxy_upstream.to_string())
+        .replace("{socks_host}", &plan.proxy_upstream.ip().to_string())
+        .replace("{socks_port}", &plan.proxy_upstream.port().to_string())
+        .replace("{socks_addr}", &plan.proxy_upstream.to_string())
 }
 
 fn escape_for_single_quote(s: &str) -> String {
@@ -325,7 +335,7 @@ fn escape_for_single_quote(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::render_transparent_cmd;
-    use crate::config::{LinuxBackendArg, ModeArg, RulePlan};
+    use crate::config::{LinuxBackendArg, ModeArg, ProxyTypeArg, RulePlan};
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
     fn sample_plan() -> RulePlan {
@@ -333,7 +343,8 @@ mod tests {
             mode: ModeArg::Transparent,
             listen_ip: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
             listen_port: 18080,
-            socks_upstream: SocketAddr::from((Ipv4Addr::new(127, 0, 0, 1), 1080)),
+            proxy_upstream: SocketAddr::from((Ipv4Addr::new(127, 0, 0, 1), 1080)),
+            proxy_type: ProxyTypeArg::Socks5,
             include_cidrs: vec!["0.0.0.0/0".to_string()],
             exclude_cidrs: vec![],
             dns_capture: false,

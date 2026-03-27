@@ -2,14 +2,21 @@
 
 Rust rewrite draft focused on a practical objective:
 
-- turn an existing SOCKS5 proxy into a system-wide transparent TCP proxy backend,
-- with a clean cross-platform architecture (Linux implemented first, Windows planned).
+- turn an existing upstream proxy into a system-wide transparent TCP proxy backend,
+- with a clean cross-platform architecture.
+
+Supported upstream proxy types:
+- `socks5`
+- `socks4`
+- `http` (CONNECT)
 
 ## Run (dry-run)
 
 ```bash
-cargo run -- run --mode transparent --socks5 127.0.0.1:1080 --listen 127.0.0.1:18080 --dry-run
+cargo run -- run --mode transparent --proxy 127.0.0.1:1080 --proxy-type socks5 --listen 127.0.0.1:18080 --dry-run
 ```
+
+`--socks5` is still accepted as an alias of `--proxy` for compatibility.
 
 ## Doctor (dependency preflight)
 
@@ -23,10 +30,10 @@ cargo run -- doctor --mode transparent --platform auto --linux-backend auto --dn
 cargo run -- cleanup --mode transparent --platform auto --listen 127.0.0.1:18080
 ```
 
-## Linux transparent mode (apply iptables rules)
+## Linux transparent mode (apply rules)
 
 ```bash
-sudo cargo run -- run --mode transparent --socks5 127.0.0.1:1080 --listen 127.0.0.1:18080
+sudo cargo run -- run --mode transparent --proxy 127.0.0.1:1080 --proxy-type socks5 --listen 127.0.0.1:18080
 ```
 
 Use backend selection when needed:
@@ -42,7 +49,8 @@ sudo cargo run -- run \
   --mode transparent \
   --ssh-remote user@example.com \
   --ssh-cmd ssh \
-  --socks5 127.0.0.1:1080 \
+  --proxy 127.0.0.1:1080 \
+  --proxy-type socks5 \
   --listen 127.0.0.1:18080
 ```
 
@@ -51,7 +59,8 @@ sudo cargo run -- run \
 ```bash
 sudo cargo run -- run \
   --mode transparent \
-  --socks5 127.0.0.1:1080 \
+  --proxy 127.0.0.1:1080 \
+  --proxy-type socks5 \
   --listen 127.0.0.1:18080 \
   --dns-capture \
   --dns-listen 127.0.0.1:15353 \
@@ -59,14 +68,15 @@ sudo cargo run -- run \
   --dns-via-socks true
 ```
 
-## Windows system-proxy mode (MVP)
+Note: DNS via proxy (`--dns-via-socks`) currently requires `--proxy-type socks5`.
+
+## Windows system-proxy mode
 
 ```powershell
-cargo run -- run --mode system-proxy --platform windows --socks5 127.0.0.1:1080
+cargo run -- run --mode system-proxy --platform windows --proxy 127.0.0.1:1080 --proxy-type socks5
 ```
 
-Stop with Ctrl+C; cleanup will restore registry proxy settings.
-The app now snapshots previous `ProxyEnable/ProxyServer` and restores them on exit.
+Stop with Ctrl+C; cleanup restores registry proxy settings.
 
 ## Windows transparent mode (worker command bridge)
 
@@ -74,22 +84,22 @@ The app now snapshots previous `ProxyEnable/ProxyServer` and restores them on ex
 cargo run -- run `
   --mode transparent `
   --platform windows `
-  --socks5 127.0.0.1:1080 `
-  --win-transparent-cmd "my-windivert-worker.exe --listen {listen_port} --socks {socks_addr}"
+  --proxy 127.0.0.1:1080 `
+  --proxy-type socks5 `
+  --win-transparent-cmd "my-windivert-worker.exe --listen {listen_port} --proxy {proxy_addr}"
 ```
 
 Supported placeholders in command templates:
 - `{listen_port}`
-- `{socks_host}`
-- `{socks_port}`
-- `{socks_addr}`
+- `{proxy_host}`
+- `{proxy_port}`
+- `{proxy_addr}`
+- `{socks_host}` / `{socks_port}` / `{socks_addr}` (compat aliases)
 
 ## Status
 
-- Linux backend: implemented (iptables OUTPUT redirect chain).
-- Linux backend: dual-stack rule engine (`iptables` + `ip6tables`).
-- Linux backend selector: `auto | iptables | nft`.
-- Transparent TCP relay to SOCKS5: implemented.
+- Linux backend: dual-stack (`iptables` + `ip6tables`) and `nft` selector.
+- Transparent TCP relay to upstream proxy: socks5/socks4/http supported.
 - Optional SSH dynamic tunnel bootstrap (`ssh -N -D`): implemented.
 - DNS capture (Linux): implemented (`udp/53` redirect + local DNS forwarder).
 - Windows backend:

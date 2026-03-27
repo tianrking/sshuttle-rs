@@ -24,8 +24,11 @@ pub struct RunArgs {
     #[arg(long, default_value = "127.0.0.1:18080")]
     pub listen: SocketAddr,
 
-    #[arg(long, default_value = "127.0.0.1:1080")]
-    pub socks5: SocketAddr,
+    #[arg(long, alias = "socks5", default_value = "127.0.0.1:1080")]
+    pub proxy: SocketAddr,
+
+    #[arg(long, value_enum, default_value_t = ProxyTypeArg::Socks5)]
+    pub proxy_type: ProxyTypeArg,
 
     #[arg(long)]
     pub ssh_remote: Option<String>,
@@ -92,6 +95,9 @@ pub struct DoctorArgs {
 
     #[arg(long, default_value_t = true)]
     pub dns_via_socks: bool,
+
+    #[arg(long, value_enum, default_value_t = ProxyTypeArg::Socks5)]
+    pub proxy_type: ProxyTypeArg,
 }
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
@@ -114,11 +120,19 @@ pub enum LinuxBackendArg {
     Nft,
 }
 
+#[derive(Clone, Copy, Debug, ValueEnum, PartialEq, Eq)]
+pub enum ProxyTypeArg {
+    Socks5,
+    Socks4,
+    Http,
+}
+
 #[derive(Debug, Clone)]
 pub struct RuntimeConfig {
     pub mode: ModeArg,
     pub listen: SocketAddr,
-    pub socks5: SocketAddr,
+    pub proxy: SocketAddr,
+    pub proxy_type: ProxyTypeArg,
     pub ssh_remote: Option<String>,
     pub ssh_cmd: String,
     pub win_transparent_cmd: Option<String>,
@@ -140,7 +154,8 @@ impl From<RunArgs> for RuntimeConfig {
         Self {
             mode: value.mode,
             listen: value.listen,
-            socks5: value.socks5,
+            proxy: value.proxy,
+            proxy_type: value.proxy_type,
             ssh_remote: value.ssh_remote,
             ssh_cmd: value.ssh_cmd,
             win_transparent_cmd: value.win_transparent_cmd,
@@ -168,6 +183,7 @@ pub struct DoctorConfig {
     pub ssh_remote: Option<String>,
     pub dns_capture: bool,
     pub dns_via_socks: bool,
+    pub proxy_type: ProxyTypeArg,
 }
 
 impl From<DoctorArgs> for DoctorConfig {
@@ -180,6 +196,7 @@ impl From<DoctorArgs> for DoctorConfig {
             ssh_remote: value.ssh_remote,
             dns_capture: value.dns_capture,
             dns_via_socks: value.dns_via_socks,
+            proxy_type: value.proxy_type,
         }
     }
 }
@@ -189,7 +206,8 @@ pub struct RulePlan {
     pub mode: ModeArg,
     pub listen_ip: IpAddr,
     pub listen_port: u16,
-    pub socks_upstream: SocketAddr,
+    pub proxy_upstream: SocketAddr,
+    pub proxy_type: ProxyTypeArg,
     pub include_cidrs: Vec<String>,
     pub exclude_cidrs: Vec<String>,
     pub dns_capture: bool,
@@ -204,7 +222,7 @@ impl RuntimeConfig {
     pub fn to_rule_plan(&self) -> RulePlan {
         let mut excludes = self.exclude_cidrs.clone();
         excludes.push(loopback_exclusion(self.listen.ip()));
-        excludes.push(single_host_cidr(self.socks5.ip()));
+        excludes.push(single_host_cidr(self.proxy.ip()));
         if self.dns_capture {
             excludes.push(single_host_cidr(self.dns_upstream.ip()));
         }
@@ -213,7 +231,8 @@ impl RuntimeConfig {
             mode: self.mode,
             listen_ip: self.listen.ip(),
             listen_port: self.listen.port(),
-            socks_upstream: self.socks5,
+            proxy_upstream: self.proxy,
+            proxy_type: self.proxy_type,
             include_cidrs: self.include_cidrs.clone(),
             exclude_cidrs: excludes,
             dns_capture: self.dns_capture,
@@ -242,7 +261,7 @@ fn single_host_cidr(ip: IpAddr) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{LinuxBackendArg, ModeArg, PlatformArg, RunArgs, RuntimeConfig};
+    use super::{LinuxBackendArg, ModeArg, PlatformArg, ProxyTypeArg, RunArgs, RuntimeConfig};
     use std::net::{Ipv4Addr, SocketAddr};
 
     #[test]
@@ -250,7 +269,8 @@ mod tests {
         let args = RunArgs {
             mode: ModeArg::Transparent,
             listen: SocketAddr::from((Ipv4Addr::new(127, 0, 0, 1), 18080)),
-            socks5: SocketAddr::from((Ipv4Addr::new(127, 0, 0, 1), 1080)),
+            proxy: SocketAddr::from((Ipv4Addr::new(127, 0, 0, 1), 1080)),
+            proxy_type: ProxyTypeArg::Socks5,
             ssh_remote: None,
             ssh_cmd: "ssh".to_string(),
             win_transparent_cmd: None,

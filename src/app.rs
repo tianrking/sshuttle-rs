@@ -3,7 +3,7 @@ use std::process::Stdio;
 use tokio::task::JoinHandle;
 use tokio::{process::Child, process::Command as TokioCommand, time::Duration};
 
-use crate::config::{Cli, Command, ModeArg, RuntimeConfig};
+use crate::config::{Cli, Command, ModeArg, ProxyTypeArg, RuntimeConfig};
 use crate::doctor;
 use crate::platform::{build_platform, CommandExecutor};
 use crate::proxy::{DnsProxy, TransparentProxy};
@@ -22,7 +22,7 @@ async fn run_mode(cfg: RuntimeConfig) -> Result<()> {
     let rules = cfg.to_rule_plan();
 
     println!("[info] selected platform backend: {}", platform.name());
-    println!("[info] socks5 upstream: {}", cfg.socks5);
+    println!("[info] upstream proxy: {} ({:?})", cfg.proxy, cfg.proxy_type);
     println!("[info] transparent listen: {}", cfg.listen);
     println!("[info] dns capture: {}", if cfg.dns_capture { "on" } else { "off" });
 
@@ -38,7 +38,7 @@ async fn run_mode(cfg: RuntimeConfig) -> Result<()> {
         ModeArg::Transparent => {
             println!("[info] run mode: transparent");
             if platform.name().starts_with("linux/") {
-                let proxy = TransparentProxy::new(cfg.listen, cfg.socks5);
+                let proxy = TransparentProxy::new(cfg.listen, cfg.proxy, cfg.proxy_type);
                 run_tasks.push(tokio::spawn(async move { proxy.run().await }));
             } else {
                 println!(
@@ -47,7 +47,13 @@ async fn run_mode(cfg: RuntimeConfig) -> Result<()> {
             }
 
             if cfg.dns_capture {
-                let dns = DnsProxy::new(cfg.dns_listen, cfg.dns_upstream, cfg.socks5, cfg.dns_via_socks);
+                let via_socks = cfg.dns_via_socks && cfg.proxy_type == ProxyTypeArg::Socks5;
+                if cfg.dns_via_socks && !via_socks {
+                    println!(
+                        "[warn] DNS via proxy is only supported with socks5; fallback to direct DNS upstream"
+                    );
+                }
+                let dns = DnsProxy::new(cfg.dns_listen, cfg.dns_upstream, cfg.proxy, via_socks);
                 run_tasks.push(tokio::spawn(async move { dns.run().await }));
             }
         }
@@ -81,16 +87,19 @@ async fn start_ssh_dynamic_tunnel(cfg: &RuntimeConfig) -> Result<Option<Child>> 
     let Some(remote) = &cfg.ssh_remote else {
         return Ok(None);
     };
+    if cfg.proxy_type != ProxyTypeArg::Socks5 {
+        anyhow::bail!("--ssh-remote is only supported with --proxy-type socks5");
+    }
 
     println!(
         "[info] starting ssh dynamic tunnel: {} -N -D {} {}",
-        cfg.ssh_cmd, cfg.socks5, remote
+        cfg.ssh_cmd, cfg.proxy, remote
     );
 
     let mut child = TokioCommand::new(&cfg.ssh_cmd)
         .arg("-N")
         .arg("-D")
-        .arg(cfg.socks5.to_string())
+        .arg(cfg.proxy.to_string())
         .arg(remote)
         .stdin(Stdio::null())
         .stdout(Stdio::inherit())

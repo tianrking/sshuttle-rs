@@ -1,7 +1,7 @@
 use anyhow::Result;
 use tokio::process::Command;
 
-use crate::config::{DoctorConfig, LinuxBackendArg, ModeArg, PlatformArg};
+use crate::config::{DoctorConfig, LinuxBackendArg, ModeArg, PlatformArg, ProxyTypeArg};
 
 pub async fn run(cfg: DoctorConfig) -> Result<()> {
     let platform = resolved_platform(cfg.requested_platform);
@@ -43,7 +43,14 @@ pub async fn run(cfg: DoctorConfig) -> Result<()> {
     }
 
     if cfg.dns_capture && cfg.dns_via_socks {
-        println!("[doctor] DNS over SOCKS UDP associate is enabled");
+        if cfg.proxy_type == ProxyTypeArg::Socks5 {
+            println!("[doctor] DNS over SOCKS UDP associate is enabled");
+        } else {
+            println!(
+                "[doctor][warn] --dns-via-socks requires --proxy-type socks5, current={:?}",
+                cfg.proxy_type
+            );
+        }
     }
 
     if missing == 0 {
