@@ -1,42 +1,29 @@
-# sshuttle-rs
+﻿# sshuttle-rs
 
-Rust rewrite draft focused on a practical objective:
+[中文说明](README_CN.md)
 
-- turn an existing upstream proxy into a system-wide transparent TCP proxy backend,
-- with a clean cross-platform architecture.
+A Rust-based transparent proxy orchestrator that can convert an upstream proxy into system-wide routing, with platform backends for Linux and Windows.
 
-Supported upstream proxy types:
-- `socks5`
-- `socks4`
-- `http` (CONNECT)
+## Highlights
 
-## Run (dry-run)
+- Upstream proxy types: `socks5`, `socks4`, `http` (CONNECT)
+- Linux transparent backend: `iptables/ip6tables` and `nft` selector
+- Linux bypass controls: `--bypass-uid`, `--bypass-gid`
+- Windows modes:
+  - `system-proxy` (WinINET registry)
+  - `transparent` (built-in native worker minimal + external worker override)
+- DNS capture: optional (`--dns-capture`), SOCKS5 UDP path supported
+- Operations helpers: `doctor`, `cleanup`
 
-```bash
-cargo run -- run --mode transparent --proxy 127.0.0.1:1080 --proxy-type socks5 --listen 127.0.0.1:18080 --dry-run
-```
-
-`--socks5` is still accepted as an alias of `--proxy` for compatibility.
-
-## Doctor (dependency preflight)
+## Quick Start
 
 ```bash
-cargo run -- doctor --mode transparent --platform auto --linux-backend auto --dns-capture
+cargo run -- run --mode transparent --proxy 127.0.0.1:1080 --proxy-type socks5 --listen 127.0.0.1:18080
 ```
 
-## Cleanup (manual recover)
+## Process Bypass (Any Program)
 
-```bash
-cargo run -- cleanup --mode transparent --platform auto --listen 127.0.0.1:18080
-```
-
-## Linux transparent mode (apply rules)
-
-```bash
-sudo cargo run -- run --mode transparent --proxy 127.0.0.1:1080 --proxy-type socks5 --listen 127.0.0.1:18080
-```
-
-Bypass specific process identities (critical for avoiding proxy-loop of your upstream proxy program itself):
+Linux (kernel-level owner match):
 
 ```bash
 sudo cargo run -- run \
@@ -47,54 +34,7 @@ sudo cargo run -- run \
   --bypass-gid 1001
 ```
 
-Recommended pattern:
-- Run your upstream proxy daemon under a dedicated Linux user (for example `proxydaemon`).
-- Pass that UID/GID to `--bypass-uid/--bypass-gid`.
-- Then all other processes are transparently forwarded, but that daemon itself is bypassed safely.
-
-Use backend selection when needed:
-
-```bash
-sudo cargo run -- run --mode transparent --linux-backend nft
-```
-
-## Linux transparent mode with built-in SSH dynamic tunnel
-
-```bash
-sudo cargo run -- run \
-  --mode transparent \
-  --ssh-remote user@example.com \
-  --ssh-cmd ssh \
-  --proxy 127.0.0.1:1080 \
-  --proxy-type socks5 \
-  --listen 127.0.0.1:18080
-```
-
-## Linux transparent mode with DNS capture
-
-```bash
-sudo cargo run -- run \
-  --mode transparent \
-  --proxy 127.0.0.1:1080 \
-  --proxy-type socks5 \
-  --listen 127.0.0.1:18080 \
-  --dns-capture \
-  --dns-listen 127.0.0.1:15353 \
-  --dns-upstream 1.1.1.1:53 \
-  --dns-via-socks true
-```
-
-Note: DNS via proxy (`--dns-via-socks`) currently requires `--proxy-type socks5`.
-
-## Windows system-proxy mode
-
-```powershell
-cargo run -- run --mode system-proxy --platform windows --proxy 127.0.0.1:1080 --proxy-type socks5
-```
-
-Stop with Ctrl+C; cleanup restores registry proxy settings.
-
-## Windows transparent mode (worker command bridge)
+Windows (transparent mode; passed to worker/native backend):
 
 ```powershell
 cargo run -- run `
@@ -102,39 +42,49 @@ cargo run -- run `
   --platform windows `
   --proxy 127.0.0.1:1080 `
   --proxy-type socks5 `
-  --bypass-process "my-proxy.exe" `
-  --bypass-process "another-daemon.exe"
+  --bypass-process "program-a.exe" `
+  --bypass-process "program-b.exe"
 ```
 
-Default behavior now uses built-in native worker (`win-native-worker` hidden subcommand).
-You can still override with external worker command via `--win-transparent-cmd`.
+## Command Examples
 
-Supported placeholders in command templates:
-- `{listen_port}`
-- `{proxy_host}`
-- `{proxy_port}`
-- `{proxy_addr}`
-- `{bypass_processes_csv}`
-- `{bypass_processes_semicolon}`
-- `{socks_host}` / `{socks_port}` / `{socks_addr}` (compat aliases)
+Dry-run:
 
-## Status
+```bash
+cargo run -- run --mode transparent --proxy 127.0.0.1:1080 --proxy-type socks5 --dry-run
+```
 
-- Linux backend: dual-stack (`iptables` + `ip6tables`) and `nft` selector.
-- Linux per-process bypass: supported via `--bypass-uid` / `--bypass-gid`.
-- Transparent TCP relay to upstream proxy: socks5/socks4/http supported.
-- Optional SSH dynamic tunnel bootstrap (`ssh -N -D`): implemented.
-- DNS capture (Linux): implemented (`udp/53` redirect + local DNS forwarder).
-- Windows backend:
-  - system-proxy mode: implemented (registry-based WinINET proxy toggle).
-  - transparent mode: built-in native worker (minimal) + optional external worker override; WinDivert/WFP dataplane is next.
+Doctor:
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for architecture and roadmap.
+```bash
+cargo run -- doctor --mode transparent --platform auto --linux-backend auto --dns-capture
+```
 
-CI runs `cargo check`, `cargo test`, and `cargo clippy -D warnings` on push/PR.
+Cleanup:
 
-## Build Matrix
+```bash
+cargo run -- cleanup --mode transparent --platform auto --listen 127.0.0.1:18080
+```
 
+## Capability Matrix
+
+| Capability | Linux | Windows |
+|---|---|---|
+| Transparent TCP redirect | Yes | Yes (native worker minimal / external worker) |
+| Per-process bypass | Yes (`uid/gid`) | Yes (`--bypass-process` in transparent mode) |
+| DNS capture | Yes | Depends on transparent backend worker/native dataplane |
+| Upstream socks5/socks4/http | Yes | Yes |
+
+## CI / Release
+
+CI runs:
+- `cargo check`
+- `cargo test`
+- `cargo clippy -D warnings`
+
+Release is tag-driven (`v*`) with multi-arch artifacts.
+
+Build matrix:
 - Linux AMD64: `x86_64-unknown-linux-gnu`
 - Linux ARM64: `aarch64-unknown-linux-gnu`
 - Linux ARM32: `armv7-unknown-linux-gnueabihf`
@@ -142,7 +92,7 @@ CI runs `cargo check`, `cargo test`, and `cargo clippy -D warnings` on push/PR.
 - Windows ARM64: `aarch64-pc-windows-msvc`
 - Windows 32-bit x86: `i686-pc-windows-msvc`
 
-Note: Rust stable currently does not provide `rust-std` for `thumbv7a-pc-windows-msvc`,
-so Windows ARM32 release artifacts are temporarily disabled in CI/release workflows.
+## Architecture
 
-Tagging `v*` triggers release artifact builds for the matrix above.
+- [Architecture (English)](docs/ARCHITECTURE_EN.md)
+- [架构说明（中文）](docs/ARCHITECTURE_CN.md)
