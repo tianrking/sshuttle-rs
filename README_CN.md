@@ -11,7 +11,7 @@
 - Linux 进程绕过：`--bypass-uid`、`--bypass-gid`
 - Windows 模式：
   - `system-proxy`（WinINET 注册表）
-  - `transparent`（内置 native worker 最小版 + 外部 worker 覆盖）
+  - `transparent`（内置 native worker，可自动接管外部 WinDivert 引擎）
 - DNS 捕获：可选（`--dns-capture`），支持 SOCKS5 UDP 路径
 - 运维命令：`doctor`、`cleanup`
 

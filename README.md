@@ -11,7 +11,7 @@ A Rust-based transparent proxy orchestrator that can convert an upstream proxy i
 - Linux bypass controls: `--bypass-uid`, `--bypass-gid`
 - Windows modes:
   - `system-proxy` (WinINET registry)
-  - `transparent` (built-in native worker minimal + external worker override)
+  - `transparent` (built-in native worker with external WinDivert engine handoff)
 - DNS capture: optional (`--dns-capture`), SOCKS5 UDP path supported
 - Operations helpers: `doctor`, `cleanup`
 
