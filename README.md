@@ -75,6 +75,7 @@ Windows native dataplane dependency (required):
 - place `WinDivert.dll` and matching `WinDivert*.sys` beside `sshuttle-rs.exe`
 - or set build/runtime env to driver bundle path via `WINDIVERT_PATH`
 - run in elevated shell (Administrator)
+- Official release zip already bundles WinDivert runtime for `x86_64` and `i686` Windows targets.
 
 You can use either `json` or `yaml`; see:
 - `examples/policy.sample.yaml`
@@ -156,6 +157,7 @@ Native packaging note:
   - `sshuttle-rs.exe`
   - `WinDivert.dll`
   - `WinDivert64.sys` (and architecture variants when applicable)
+- `aarch64-pc-windows-msvc` artifact includes a note file only for WinDivert runtime because official WinDivert arm64 package is unavailable.
 
 ## Architecture
 

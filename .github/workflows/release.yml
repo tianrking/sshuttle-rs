@@ -43,16 +43,19 @@ jobs:
             use_cross: false
             archive: zip
             experimental: false
+            windivert_bundle: x64
           - os: windows-latest
             target: aarch64-pc-windows-msvc
             use_cross: false
             archive: zip
             experimental: false
+            windivert_bundle: none
           - os: windows-latest
             target: i686-pc-windows-msvc
             use_cross: false
             archive: zip
             experimental: false
+            windivert_bundle: x86
     continue-on-error: ${{ matrix.experimental }}
     runs-on: ${{ matrix.os }}
     env:
@@ -71,6 +74,13 @@ jobs:
       - name: Build (cargo)
         if: ${{ !matrix.use_cross }}
         run: cargo build --release --target ${{ matrix.target }}
+      - name: Download WinDivert runtime
+        if: runner.os == 'Windows' && matrix.windivert_bundle != 'none'
+        shell: pwsh
+        run: |
+          $url = "https://reqrypt.org/download/WinDivert-2.2.2-A.zip"
+          Invoke-WebRequest -Uri $url -OutFile windivert.zip
+          Expand-Archive -Path windivert.zip -DestinationPath windivert -Force
       - name: Package linux artifact
         if: runner.os != 'Windows'
         run: |
@@ -79,7 +89,23 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          Compress-Archive -Path target\${env:TARGET}\release\sshuttle-rs.exe -DestinationPath sshuttle-rs-${env:TARGET}.zip
+          $pkg = "pkg-${env:TARGET}"
+          New-Item -ItemType Directory -Force -Path $pkg | Out-Null
+          Copy-Item "target\${env:TARGET}\release\sshuttle-rs.exe" "$pkg\sshuttle-rs.exe" -Force
+
+          if ("${{ matrix.windivert_bundle }}" -eq "x64") {
+            Copy-Item "windivert\WinDivert-2.2.2-A\x64\WinDivert.dll" "$pkg\WinDivert.dll" -Force
+            Copy-Item "windivert\WinDivert-2.2.2-A\x64\WinDivert64.sys" "$pkg\WinDivert64.sys" -Force
+            Copy-Item "windivert\WinDivert-2.2.2-A\x86\WinDivert32.sys" "$pkg\WinDivert32.sys" -Force
+          } elseif ("${{ matrix.windivert_bundle }}" -eq "x86") {
+            Copy-Item "windivert\WinDivert-2.2.2-A\x86\WinDivert.dll" "$pkg\WinDivert.dll" -Force
+            Copy-Item "windivert\WinDivert-2.2.2-A\x64\WinDivert64.sys" "$pkg\WinDivert64.sys" -Force
+            Copy-Item "windivert\WinDivert-2.2.2-A\x86\WinDivert32.sys" "$pkg\WinDivert32.sys" -Force
+          } else {
+            "This target does not include bundled WinDivert runtime (no official arm64 package)." | Out-File "$pkg\WINDOWS_ARM64_NOTE.txt" -Encoding utf8
+          }
+
+          Compress-Archive -Path "$pkg\*" -DestinationPath sshuttle-rs-${env:TARGET}.zip
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:

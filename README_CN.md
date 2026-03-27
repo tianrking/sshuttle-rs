@@ -75,6 +75,7 @@ Windows 原生数据面依赖（必须）：
 - `sshuttle-rs.exe` 同目录放置 `WinDivert.dll` 与匹配的 `WinDivert*.sys`
 - 或通过 `WINDIVERT_PATH` 指向驱动文件目录
 - 需要管理员权限运行
+- 官方 release 的 Windows `x86_64` / `i686` zip 已自动打包 WinDivert 运行时文件。
 
 JSON 和 YAML 都支持，示例：
 - `examples/policy.sample.yaml`
@@ -155,6 +156,7 @@ Windows 发布包必须包含：
 - `sshuttle-rs.exe`
 - `WinDivert.dll`
 - `WinDivert64.sys`（以及对应架构版本）
+- `aarch64-pc-windows-msvc` 产物会附带说明文件；由于官方暂无 arm64 WinDivert 包，不会自动内置完整驱动。
 
 ## 架构文档
 
