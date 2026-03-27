@@ -7,12 +7,14 @@ use crate::config::{Cli, Command, ModeArg, ProxyTypeArg, RuntimeConfig};
 use crate::doctor;
 use crate::platform::{build_platform, CommandExecutor};
 use crate::proxy::{DnsProxy, TransparentProxy};
+use crate::win_native;
 
 pub async fn run(cli: Cli) -> Result<()> {
     match cli.command {
         Command::Run(args) => run_mode(args.into()).await,
         Command::Doctor(args) => doctor::run(args.into()).await,
         Command::Cleanup(args) => cleanup_mode(args.into()).await,
+        Command::WinNativeWorker(args) => win_native::run(args).await,
     }
 }
 

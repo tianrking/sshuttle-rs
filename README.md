@@ -103,9 +103,11 @@ cargo run -- run `
   --proxy 127.0.0.1:1080 `
   --proxy-type socks5 `
   --bypass-process "my-proxy.exe" `
-  --bypass-process "another-daemon.exe" `
-  --win-transparent-cmd "my-windivert-worker.exe --listen {listen_port} --proxy {proxy_addr} --bypass {bypass_processes_csv}"
+  --bypass-process "another-daemon.exe"
 ```
+
+Default behavior now uses built-in native worker (`win-native-worker` hidden subcommand).
+You can still override with external worker command via `--win-transparent-cmd`.
 
 Supported placeholders in command templates:
 - `{listen_port}`
@@ -125,7 +127,7 @@ Supported placeholders in command templates:
 - DNS capture (Linux): implemented (`udp/53` redirect + local DNS forwarder).
 - Windows backend:
   - system-proxy mode: implemented (registry-based WinINET proxy toggle).
-  - transparent mode: worker-command bridge implemented; native WinDivert/WFP backend is next.
+  - transparent mode: built-in native worker (minimal) + optional external worker override; WinDivert/WFP dataplane is next.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for architecture and roadmap.
 

@@ -128,13 +128,11 @@ impl Platform for WindowsPlatform {
 }
 
 async fn apply_transparent_worker(plan: &RulePlan, exec: &CommandExecutor) -> Result<()> {
-    let cmd_tpl = plan.win_transparent_cmd.as_ref().ok_or_else(|| {
-        anyhow::anyhow!(
-            "Windows transparent mode requires --win-transparent-cmd. \
-Example: --win-transparent-cmd \"my-windivert-worker.exe --listen {{listen_port}} --socks {{socks_host}}:{{socks_port}}\""
-        )
-    })?;
-    let rendered = render_transparent_cmd(cmd_tpl, plan);
+    let rendered = if let Some(cmd_tpl) = &plan.win_transparent_cmd {
+        render_transparent_cmd(cmd_tpl, plan)
+    } else {
+        built_in_worker_cmd(plan)?
+    };
     let with_env = if plan.bypass_processes.is_empty() {
         rendered.clone()
     } else {
@@ -345,6 +343,31 @@ fn render_transparent_cmd(tpl: &str, plan: &RulePlan) -> String {
 
 fn escape_for_single_quote(s: &str) -> String {
     s.replace('\'', "''")
+}
+
+fn built_in_worker_cmd(plan: &RulePlan) -> Result<String> {
+    let exe = std::env::current_exe()?;
+    let mut parts = vec![
+        quote_cmd_arg(exe.to_string_lossy().as_ref()),
+        "win-native-worker".to_string(),
+        "--listen-port".to_string(),
+        plan.listen_port.to_string(),
+        "--proxy-addr".to_string(),
+        quote_cmd_arg(&plan.proxy_upstream.to_string()),
+    ];
+    for p in &plan.bypass_processes {
+        parts.push("--bypass-process".to_string());
+        parts.push(quote_cmd_arg(p));
+    }
+    Ok(parts.join(" "))
+}
+
+fn quote_cmd_arg(s: &str) -> String {
+    if s.contains(' ') || s.contains('"') {
+        format!("\"{}\"", s.replace('"', "\\\""))
+    } else {
+        s.to_string()
+    }
 }
 
 #[cfg(test)]

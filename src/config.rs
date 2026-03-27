@@ -14,6 +14,8 @@ pub enum Command {
     Run(RunArgs),
     Doctor(DoctorArgs),
     Cleanup(RunArgs),
+    #[command(hide = true)]
+    WinNativeWorker(WinNativeWorkerArgs),
 }
 
 #[derive(Debug, clap::Args)]
@@ -107,6 +109,16 @@ pub struct DoctorArgs {
 
     #[arg(long, value_enum, default_value_t = ProxyTypeArg::Socks5)]
     pub proxy_type: ProxyTypeArg,
+}
+
+#[derive(Debug, clap::Args)]
+pub struct WinNativeWorkerArgs {
+    #[arg(long)]
+    pub listen_port: u16,
+    #[arg(long)]
+    pub proxy_addr: SocketAddr,
+    #[arg(long = "bypass-process")]
+    pub bypass_processes: Vec<String>,
 }
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
