@@ -11,6 +11,12 @@ Rust rewrite draft focused on a practical objective:
 cargo run -- run --mode transparent --socks5 127.0.0.1:1080 --listen 127.0.0.1:18080 --dry-run
 ```
 
+## Doctor (dependency preflight)
+
+```bash
+cargo run -- doctor --mode transparent --platform auto --linux-backend auto --dns-capture
+```
+
 ## Linux transparent mode (apply iptables rules)
 
 ```bash

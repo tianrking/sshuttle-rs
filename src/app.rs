@@ -4,12 +4,14 @@ use tokio::task::JoinHandle;
 use tokio::{process::Child, process::Command as TokioCommand, time::Duration};
 
 use crate::config::{Cli, Command, ModeArg, RuntimeConfig};
+use crate::doctor;
 use crate::platform::{build_platform, CommandExecutor};
 use crate::proxy::{DnsProxy, TransparentProxy};
 
 pub async fn run(cli: Cli) -> Result<()> {
     match cli.command {
         Command::Run(args) => run_mode(args.into()).await,
+        Command::Doctor(args) => doctor::run(args.into()).await,
     }
 }
 

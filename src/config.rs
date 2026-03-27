@@ -12,6 +12,7 @@ pub struct Cli {
 #[derive(Debug, clap::Subcommand)]
 pub enum Command {
     Run(RunArgs),
+    Doctor(DoctorArgs),
 }
 
 #[derive(Debug, clap::Args)]
@@ -66,6 +67,30 @@ pub struct RunArgs {
 
     #[arg(long, value_enum, default_value_t = LinuxBackendArg::Auto)]
     pub linux_backend: LinuxBackendArg,
+}
+
+#[derive(Debug, clap::Args)]
+pub struct DoctorArgs {
+    #[arg(long, value_enum, default_value_t = ModeArg::Transparent)]
+    pub mode: ModeArg,
+
+    #[arg(long, value_enum, default_value_t = PlatformArg::Auto)]
+    pub platform: PlatformArg,
+
+    #[arg(long, value_enum, default_value_t = LinuxBackendArg::Auto)]
+    pub linux_backend: LinuxBackendArg,
+
+    #[arg(long, default_value = "ssh")]
+    pub ssh_cmd: String,
+
+    #[arg(long)]
+    pub ssh_remote: Option<String>,
+
+    #[arg(long)]
+    pub dns_capture: bool,
+
+    #[arg(long, default_value_t = true)]
+    pub dns_via_socks: bool,
 }
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
@@ -129,6 +154,31 @@ impl From<RunArgs> for RuntimeConfig {
             dns_via_socks: value.dns_via_socks,
             requested_platform: value.platform,
             linux_backend: value.linux_backend,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct DoctorConfig {
+    pub mode: ModeArg,
+    pub requested_platform: PlatformArg,
+    pub linux_backend: LinuxBackendArg,
+    pub ssh_cmd: String,
+    pub ssh_remote: Option<String>,
+    pub dns_capture: bool,
+    pub dns_via_socks: bool,
+}
+
+impl From<DoctorArgs> for DoctorConfig {
+    fn from(value: DoctorArgs) -> Self {
+        Self {
+            mode: value.mode,
+            requested_platform: value.platform,
+            linux_backend: value.linux_backend,
+            ssh_cmd: value.ssh_cmd,
+            ssh_remote: value.ssh_remote,
+            dns_capture: value.dns_capture,
+            dns_via_socks: value.dns_via_socks,
         }
     }
 }
