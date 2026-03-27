@@ -1,6 +1,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 
+use crate::config::ModeArg;
 use crate::config::RulePlan;
 
 use super::{CommandExecutor, Platform};
@@ -20,6 +21,11 @@ impl Platform for LinuxPlatform {
     }
 
     async fn apply_rules(&self, plan: &RulePlan, exec: &CommandExecutor) -> Result<()> {
+        if matches!(plan.mode, ModeArg::SystemProxy) {
+            println!("[info] linux backend: system-proxy mode is a no-op.");
+            return Ok(());
+        }
+
         let chain = chain_name(plan.listen_port);
 
         exec.run("iptables", ["-t", "nat", "-N", &chain]).await.ok();
@@ -91,6 +97,10 @@ impl Platform for LinuxPlatform {
     }
 
     async fn cleanup_rules(&self, plan: &RulePlan, exec: &CommandExecutor) -> Result<()> {
+        if matches!(plan.mode, ModeArg::SystemProxy) {
+            return Ok(());
+        }
+
         let chain = chain_name(plan.listen_port);
 
         exec.run(

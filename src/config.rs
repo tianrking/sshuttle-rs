@@ -16,6 +16,9 @@ pub enum Command {
 
 #[derive(Debug, clap::Args)]
 pub struct RunArgs {
+    #[arg(long, value_enum, default_value_t = ModeArg::Transparent)]
+    pub mode: ModeArg,
+
     #[arg(long, default_value = "127.0.0.1:18080")]
     pub listen: SocketAddr,
 
@@ -45,8 +48,15 @@ pub enum PlatformArg {
     Windows,
 }
 
+#[derive(Clone, Copy, Debug, ValueEnum)]
+pub enum ModeArg {
+    Transparent,
+    SystemProxy,
+}
+
 #[derive(Debug, Clone)]
 pub struct RuntimeConfig {
+    pub mode: ModeArg,
     pub listen: SocketAddr,
     pub socks5: SocketAddr,
     pub include_cidrs: Vec<String>,
@@ -59,6 +69,7 @@ pub struct RuntimeConfig {
 impl From<RunArgs> for RuntimeConfig {
     fn from(value: RunArgs) -> Self {
         Self {
+            mode: value.mode,
             listen: value.listen,
             socks5: value.socks5,
             include_cidrs: value.include_cidrs,
@@ -72,6 +83,7 @@ impl From<RunArgs> for RuntimeConfig {
 
 #[derive(Debug, Clone)]
 pub struct RulePlan {
+    pub mode: ModeArg,
     pub listen_port: u16,
     pub socks_upstream: SocketAddr,
     pub include_cidrs: Vec<String>,
@@ -85,6 +97,7 @@ impl RuntimeConfig {
         excludes.push(format!("{}/32", self.socks5.ip()));
 
         RulePlan {
+            mode: self.mode,
             listen_port: self.listen.port(),
             socks_upstream: self.socks5,
             include_cidrs: self.include_cidrs.clone(),

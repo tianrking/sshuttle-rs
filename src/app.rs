@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use crate::config::{Cli, Command, RuntimeConfig};
+use crate::config::{Cli, Command, ModeArg, RuntimeConfig};
 use crate::platform::{build_platform, CommandExecutor};
 use crate::proxy::TransparentProxy;
 
@@ -23,14 +23,26 @@ async fn run_mode(cfg: RuntimeConfig) -> Result<()> {
         platform.apply_rules(&rules, &exec).await?;
     }
 
-    let proxy = TransparentProxy::new(cfg.listen, cfg.socks5);
-    let run_task = tokio::spawn(async move { proxy.run().await });
+    let run_task = match cfg.mode {
+        ModeArg::Transparent => {
+            let proxy = TransparentProxy::new(cfg.listen, cfg.socks5);
+            println!("[info] run mode: transparent");
+            Some(tokio::spawn(async move { proxy.run().await }))
+        }
+        ModeArg::SystemProxy => {
+            println!("[info] run mode: system-proxy");
+            println!("[info] system proxy is active; press Ctrl+C to restore settings");
+            None
+        }
+    };
 
     tokio::signal::ctrl_c().await?;
     println!("[info] received Ctrl+C, shutting down...");
 
-    run_task.abort();
-    let _ = run_task.await;
+    if let Some(run_task) = run_task {
+        run_task.abort();
+        let _ = run_task.await;
+    }
 
     if !cfg.no_apply_rules {
         platform.cleanup_rules(&rules, &exec).await?;
