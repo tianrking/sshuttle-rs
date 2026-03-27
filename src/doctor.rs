@@ -32,7 +32,7 @@ pub async fn run(cfg: DoctorConfig) -> Result<()> {
             missing += check_cmd("reg", &["/?"], "registry tool").await as usize;
             missing += check_cmd("powershell", &["-NoProfile", "-Command", "$PSVersionTable.PSVersion"], "powershell").await as usize;
             if matches!(cfg.mode, ModeArg::Transparent) {
-                println!("[doctor] transparent mode on windows currently requires --win-transparent-cmd runtime input");
+                println!("[doctor] transparent mode on windows uses built-in native worker (external worker override optional)");
                 missing += check_cmd("taskkill", &["/?"], "taskkill").await as usize;
             }
         }
