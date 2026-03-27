@@ -97,7 +97,8 @@ cargo run -- doctor `
   --policy-file .\\examples\\policy.sample.yaml `
   --bypass-check-process "sslocal.exe" `
   --bypass-check-dst 8.8.8.8:443 `
-  --bypass-check-proto tcp
+  --bypass-check-proto tcp `
+  --policy-strict
 ```
 
 Explain one flow:
@@ -149,3 +150,5 @@ Build matrix:
 
 - [Architecture (English)](docs/ARCHITECTURE_EN.md)
 - [架构说明（中文）](docs/ARCHITECTURE_CN.md)
+- [Policy Spec (English)](docs/POLICY_EN.md)
+- [Policy 规范（中文）](docs/POLICY_CN.md)

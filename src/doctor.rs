@@ -69,6 +69,19 @@ pub async fn run(cfg: DoctorConfig) -> Result<()> {
             path.display(),
             policy.rules.len()
         );
+        let validation = policy.validate();
+        for e in &validation.errors {
+            println!("[doctor][policy][error] {e}");
+        }
+        for w in &validation.warnings {
+            println!("[doctor][policy][warn] {w}");
+        }
+        if !validation.errors.is_empty() {
+            missing += validation.errors.len();
+        }
+        if cfg.policy_strict && !validation.warnings.is_empty() {
+            missing += validation.warnings.len();
+        }
         if cfg.bypass_check_processes.is_empty() {
             let inferred = policy.static_bypass_processes();
             if inferred.is_empty() {
@@ -90,18 +103,20 @@ pub async fn run(cfg: DoctorConfig) -> Result<()> {
                 let decision = policy.explain(&flow);
                 if decision.action == PolicyAction::Bypass {
                     println!(
-                        "[doctor][ok] bypass-check process={} dst={} -> BYPASS ({})",
+                        "[doctor][ok] bypass-check process={} dst={} -> BYPASS (rule={}, prio={})",
                         p,
                         cfg.bypass_check_dst,
                         decision.matched_rule.as_deref().unwrap_or("default"),
+                        decision.matched_priority.unwrap_or(0),
                     );
                 } else {
                     println!(
-                        "[doctor][warn] bypass-check process={} dst={} -> {:?} ({})",
+                        "[doctor][warn] bypass-check process={} dst={} -> {:?} (rule={}, prio={})",
                         p,
                         cfg.bypass_check_dst,
                         decision.action,
                         decision.matched_rule.as_deref().unwrap_or("default"),
+                        decision.matched_priority.unwrap_or(0),
                     );
                 }
             }

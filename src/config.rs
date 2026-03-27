@@ -141,6 +141,9 @@ pub struct DoctorArgs {
 
     #[arg(long = "bypass-check-proto", value_enum, default_value_t = FlowProtoArg::Tcp)]
     pub bypass_check_proto: FlowProtoArg,
+
+    #[arg(long)]
+    pub policy_strict: bool,
 }
 
 #[derive(Debug, clap::Args)]
@@ -290,6 +293,7 @@ pub struct DoctorConfig {
     pub bypass_check_processes: Vec<String>,
     pub bypass_check_dst: SocketAddr,
     pub bypass_check_proto: FlowProto,
+    pub policy_strict: bool,
 }
 
 impl From<DoctorArgs> for DoctorConfig {
@@ -307,6 +311,7 @@ impl From<DoctorArgs> for DoctorConfig {
             bypass_check_processes: value.bypass_check_processes,
             bypass_check_dst: value.bypass_check_dst,
             bypass_check_proto: value.bypass_check_proto.into(),
+            policy_strict: value.policy_strict,
         }
     }
 }

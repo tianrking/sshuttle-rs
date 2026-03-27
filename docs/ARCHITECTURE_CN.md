@@ -16,6 +16,7 @@
   - 透明 TCP 接入/连接/转发
   - 协议适配器（`socks5`、`socks4`、`http CONNECT`）
   - DNS 捕获与转发路径
+  - 策略评估运行时钩子（决策 + 统计）
 - 平台面（Platform Plane）
   - Linux 后端（`iptables/ip6tables` + `nft`）
   - Windows 后端（`system-proxy`、transparent native worker 路径）
@@ -29,12 +30,14 @@
   - `cleanup` 命令用于异常退出后的恢复
 - 依赖可见化
   - `doctor` 命令用于启动前检查
+  - policy 校验（`doctor --policy-file`，可选 `--policy-strict`）
 
 ## 可扩展性
 
 - 新增上游协议：在 `src/proxy/` 下增加适配模块。
 - 新增平台包转发引擎：复用现有 Linux/Windows 后端接口。
 - 策略统一在 CLI/config 表达，再编译成 `RulePlan` 下发执行。
+- policy 支持 JSON/YAML、优先级排序、冲突诊断，以及 Windows worker 的热重载钩子。
 
 ## 当前范围
 

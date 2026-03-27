@@ -16,6 +16,7 @@
   - transparent TCP accept/connect/relay
   - protocol adapters (`socks5`, `socks4`, `http CONNECT`)
   - DNS capture forwarding path
+  - policy evaluator runtime hooks (decision + stats)
 - Platform Plane
   - Linux backend (`iptables/ip6tables` + `nft`)
   - Windows backend (`system-proxy`, transparent native worker path)
@@ -29,12 +30,14 @@
   - `cleanup` command for crash/recovery workflows
 - Dependency visibility
   - `doctor` command for preflight diagnostics
+  - policy validation (`doctor --policy-file`, optional `--policy-strict`)
 
 ## Extensibility
 
 - Add new upstream proxy protocols by implementing adapter modules under `src/proxy/`.
 - Add platform packet engines behind current Windows/Linux backend interfaces.
 - Keep policy expression in CLI/config and compile into `RulePlan` for backend execution.
+- Policy supports JSON/YAML, priority ordering, conflict diagnostics, and hot-reload hooks on Windows worker.
 
 ## Current Scope
 

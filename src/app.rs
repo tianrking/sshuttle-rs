@@ -23,6 +23,16 @@ pub async fn run(cli: Cli) -> Result<()> {
 async fn run_mode(mut cfg: RuntimeConfig) -> Result<()> {
     if let Some(path) = cfg.policy_file.clone() {
         let policy = PolicyFile::load(path.as_path())?;
+        let validation = policy.validate();
+        if !validation.errors.is_empty() {
+            for e in validation.errors {
+                eprintln!("[error][policy] {e}");
+            }
+            anyhow::bail!("policy validation failed");
+        }
+        for w in validation.warnings {
+            println!("[warn][policy] {w}");
+        }
         let inferred_bypass = policy.static_bypass_processes();
         if !inferred_bypass.is_empty() {
             let mut added = 0usize;
@@ -180,7 +190,12 @@ async fn explain_mode(cfg: ExplainConfig) -> Result<()> {
     let decision = policy.explain(&flow);
     println!("[explain] action={:?}", decision.action);
     match decision.matched_rule {
-        Some(rule) => println!("[explain] matched_rule={rule}"),
+        Some(rule) => println!(
+            "[explain] matched_rule={} index={} priority={}",
+            rule,
+            decision.matched_index.unwrap_or(0),
+            decision.matched_priority.unwrap_or(0)
+        ),
         None => println!("[explain] matched_rule=<default>"),
     }
     Ok(())

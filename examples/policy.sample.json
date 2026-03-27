@@ -7,6 +7,7 @@
     {
       "name": "bypass-local-ss",
       "action": "bypass",
+      "priority": 100,
       "process": {
         "name": ["sslocal.exe", "v2ray.exe", "xray.exe"]
       }
@@ -14,6 +15,7 @@
     {
       "name": "bypass-corp-app-to-lan",
       "action": "bypass",
+      "priority": 20,
       "process": {
         "path": "C:\\Program Files\\CorpApp\\corpapp.exe"
       },
@@ -26,6 +28,7 @@
     {
       "name": "force-proxy-browser-https",
       "action": "proxy",
+      "priority": 10,
       "process": {
         "name": ["chrome.exe", "msedge.exe", "firefox.exe"]
       },
